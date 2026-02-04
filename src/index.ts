@@ -1,11 +1,13 @@
-export interface Env {}
+export interface Env {
+  DB: D1Database;
+}
 
 const HEALTH_PATH = "/health";
 
 export default {
   async fetch(request) {
-    const url = new URL(request.url);
-    if (url.pathname === HEALTH_PATH) {
+    const { pathname } = new URL(request.url);
+    if (pathname === HEALTH_PATH) {
       return new Response("healthy", { status: 200 });
     }
 

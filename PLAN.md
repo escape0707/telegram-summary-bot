@@ -57,7 +57,7 @@ ongoing cost and operational burden.
 ### Checklist
 - [x] docs: add plan
 - [x] chore: project scaffold (wrangler, tsconfig, package.json, src entry)
-- [ ] chore: D1 bindings + schema (messages, summaries, service_stats)
+- [x] chore: D1 bindings + schema (messages, summaries, service_stats)
 - [ ] feat: telegram webhook handler + signature verification
 - [ ] feat: message ingest + D1 insert
 - [ ] feat: command parsing + window parsing

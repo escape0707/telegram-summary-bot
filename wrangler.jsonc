@@ -6,10 +6,18 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "telegram-summary-bot",
 	"main": "src/index.ts",
-  "compatibility_date": "2026-02-03",
+	"compatibility_date": "2026-02-03",
 	"observability": {
 		"enabled": true
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "telegram-summary-bot",
+			"database_id": "a5dd91ca-d2c7-49fc-b0d4-83b900188a2e",
+			"preview_database_id": "5563a95a-1ac8-4ed9-843a-5936fe8e5825"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
