@@ -56,7 +56,7 @@ ongoing cost and operational burden.
 ## Step Plan (Commit-Sized)
 ### Checklist
 - [x] docs: add plan
-- [ ] chore: project scaffold (wrangler, tsconfig, package.json, src entry)
+- [x] chore: project scaffold (wrangler, tsconfig, package.json, src entry)
 - [ ] chore: D1 bindings + schema (messages, summaries, service_stats)
 - [ ] feat: telegram webhook handler + signature verification
 - [ ] feat: message ingest + D1 insert
