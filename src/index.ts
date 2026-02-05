@@ -1,11 +1,13 @@
 export interface Env {
   DB: D1Database;
   TELEGRAM_WEBHOOK_SECRET: string;
+  TELEGRAM_BOT_TOKEN: string;
 }
 
 const HEALTH_PATH = "/health";
 const TELEGRAM_PATH = "/telegram";
 const TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token";
+const TELEGRAM_API_BASE = "https://api.telegram.org";
 
 type TelegramChatType = "private" | "group" | "supergroup" | "channel";
 
@@ -59,7 +61,53 @@ type CommandParseResult =
       reason: "unknown command" | "invalid arguments" | "exceeds max hours";
     };
 
+type CommandParseErrorReason = Extract<
+  CommandParseResult,
+  { ok: false }
+>["reason"];
+
 const MAX_SUMMARY_HOURS = 24 * 7;
+
+function buildSummaryStubText(command: Extract<ParsedCommand, { type: "summary" }>): string {
+  if (command.toHours === 0) {
+    return `Summary for the last ${command.fromHours}h is not implemented yet.`;
+  }
+  return `Summary for ${command.fromHours}h to ${command.toHours}h ago is not implemented yet.`;
+}
+
+function buildSummaryErrorText(reason: CommandParseErrorReason): string {
+  if (reason === "exceeds max hours") {
+    return `Max summary window is ${MAX_SUMMARY_HOURS}h.`;
+  }
+  return `Usage: /summary [Nh [Mh]] (N=1..${MAX_SUMMARY_HOURS}, M=0..${MAX_SUMMARY_HOURS}, N > M).`;
+}
+
+async function sendTelegramMessage(
+  token: string,
+  chatId: number,
+  text: string,
+  replyToMessageId: number
+): Promise<boolean> {
+  const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      reply_parameters: {
+        message_id: replyToMessageId,
+        allow_sending_without_reply: true
+      }
+    })
+  });
+
+  if (!response.ok) {
+    console.error("Failed to sendMessage", await response.text());
+    return false;
+  }
+
+  return true;
+}
 
 function parseSummaryHours(token: string): number | undefined {
   const trimmed = token.trim().toLowerCase();
@@ -220,8 +268,35 @@ export default {
 
       if (message && hasBotCommandAtStart(message)) {
         const commandResult = parseTelegramCommand(message.text);
-        if (!commandResult.ok) {
+        let replyText: string | undefined;
+
+        if (commandResult.ok) {
+          if (commandResult.command.type === "summary") {
+            replyText = buildSummaryStubText(commandResult.command);
+          }
+        } else {
+          if (commandResult.reason !== "unknown command") {
+            replyText = buildSummaryErrorText(commandResult.reason);
+          }
           console.warn("Invalid command format", commandResult.reason);
+        }
+
+        if (replyText) {
+          const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
+          if (!botToken) {
+            console.error("TELEGRAM_BOT_TOKEN is not configured");
+            return new Response("internal error", { status: 500 });
+          }
+
+          const sent = await sendTelegramMessage(
+            botToken,
+            message.chat.id,
+            replyText,
+            message.message_id
+          );
+          if (!sent) {
+            return new Response("internal error", { status: 502 });
+          }
         }
       }
 

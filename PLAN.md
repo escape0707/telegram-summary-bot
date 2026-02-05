@@ -59,7 +59,7 @@ ongoing cost and operational burden.
 - [x] feat: telegram webhook handler + signature verification
 - [x] feat: message ingest + D1 insert
 - [x] feat: command parsing + window parsing
-- [ ] feat: summary command (stub response)
+- [x] feat: summary command (stub response)
 - [ ] feat: workers-ai summarization (shared pipeline)
 - [ ] feat: summary formatting with participants + message links
 - [ ] feat: cron trigger + daily summary dispatch
