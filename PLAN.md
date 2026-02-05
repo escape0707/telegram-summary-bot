@@ -59,7 +59,7 @@ ongoing cost and operational burden.
 - [x] chore: project scaffold (wrangler, tsconfig, package.json, src entry)
 - [x] chore: D1 bindings + schema (messages, summaries, service_stats)
 - [x] feat: telegram webhook handler + signature verification
-- [ ] feat: message ingest + D1 insert
+- [x] feat: message ingest + D1 insert
 - [ ] feat: command parsing + window parsing
 - [ ] feat: summary_1h + summary_24h (stub response)
 - [ ] feat: workers-ai summarization (shared pipeline)
@@ -71,6 +71,7 @@ ongoing cost and operational burden.
 ## Implementation Notes
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `WORKERS_AI_*`, `D1_DATABASE_*`.
 - Time windows default to UTC; allow explicit TZ in `/summary from:... to:...`.
+- When setting the Telegram webhook, set `allowed_updates` to only the update types we handle (currently `message`, `edited_message`) to reduce noise.
 
 ## Test / Validation Plan
 - Local dev: wrangler dev and webhook test with curl or Telegram test updates.
