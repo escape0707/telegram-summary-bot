@@ -43,11 +43,9 @@ ongoing cost and operational burden.
 ## Interfaces / APIs
 - Telegram webhook: POST /telegram (set via setWebhook).
 - Commands:
-  - /summary_1h
-  - /summary_24h
-  - /summary from:YYYY-MM-DDTHH:MM to:YYYY-MM-DDTHH:MM (UTC or with TZ)
+  - /summary [Nh [Mh]] (N defaults to 1 and 0 is treated as 1; Mh defaults to 0; N, M = 0..168, N > M; 'h' is optional)
+  - /summaryday (alias of /summary 24h)
   - /status
-  - /stats (alias of /status, optional)
 - Summary format (example):
   - "@user1, @user2 discussed [topic](https://t.me/<group>/<message_id>) about XXXXX"
 - Message link format for public groups:
@@ -60,8 +58,8 @@ ongoing cost and operational burden.
 - [x] chore: D1 bindings + schema (messages, summaries, service_stats)
 - [x] feat: telegram webhook handler + signature verification
 - [x] feat: message ingest + D1 insert
-- [ ] feat: command parsing + window parsing
-- [ ] feat: summary_1h + summary_24h (stub response)
+- [x] feat: command parsing + window parsing
+- [ ] feat: summary command (stub response)
 - [ ] feat: workers-ai summarization (shared pipeline)
 - [ ] feat: summary formatting with participants + message links
 - [ ] feat: cron trigger + daily summary dispatch
@@ -70,8 +68,9 @@ ongoing cost and operational burden.
 
 ## Implementation Notes
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `WORKERS_AI_*`, `D1_DATABASE_*`.
-- Time windows default to UTC; allow explicit TZ in `/summary from:... to:...`.
+ - Summary windows are hour-based: `/summary [Nh [Mh]]` uses the range from N hours before to M hours before, defaulting to 1h→0h.
 - When setting the Telegram webhook, set `allowed_updates` to only the update types we handle (currently `message`, `edited_message`) to reduce noise.
+- Register bot commands (BotFather or `setMyCommands`) for `/summary`, `/summaryday`, `/status` so they show in the UI.
 
 ## Test / Validation Plan
 - Local dev: wrangler dev and webhook test with curl or Telegram test updates.

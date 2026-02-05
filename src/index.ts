@@ -25,11 +25,19 @@ type TelegramMessage = {
   date: number;
   text?: string;
   caption?: string;
+  entities?: TelegramMessageEntity[];
+  caption_entities?: TelegramMessageEntity[];
   from?: TelegramUser;
   chat: TelegramChat;
   reply_to_message?: {
     message_id: number;
   };
+};
+
+type TelegramMessageEntity = {
+  type: "mention" | "hashtag" | "cashtag" | "bot_command" | "url" | "email" | "phone_number" | "bold" | "italic" | "underline" | "strikethrough" | "spoiler" | "blockquote" | "expandable_blockquote" | "code" | "pre" | "text_link" | "text_mention" | "custom_emoji";
+  offset: number;
+  length: number;
 };
 
 type TelegramUpdate = {
@@ -39,6 +47,105 @@ type TelegramUpdate = {
 };
 
 const GROUP_CHAT_TYPES: TelegramChatType[] = ["group", "supergroup"];
+
+type ParsedCommand =
+  | { type: "summary"; fromHours: number; toHours: number }
+  | { type: "status" };
+
+type CommandParseResult =
+  | { ok: true; command: ParsedCommand }
+  | {
+      ok: false;
+      reason: "unknown command" | "invalid arguments" | "exceeds max hours";
+    };
+
+const MAX_SUMMARY_HOURS = 24 * 7;
+
+function parseSummaryHours(token: string): number | undefined {
+  const trimmed = token.trim().toLowerCase();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const numericPart = trimmed.endsWith("h") ? trimmed.slice(0, -1) : trimmed;
+  if (!/^\d+$/.test(numericPart)) {
+    return undefined;
+  }
+
+  const parsed = Number(numericPart);
+  if (!Number.isFinite(parsed)) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function parseTelegramCommand(text: string): CommandParseResult {
+  const trimmed = text.trim();
+  const [rawCommand, ...tokens] = trimmed.split(/\s+/);
+  const commandToken = rawCommand.replace(/^\//, "");
+  if (!commandToken) {
+    return { ok: false, reason: "unknown command" };
+  }
+
+  const command = commandToken.split("@", 1)[0].toLowerCase();
+  switch (command) {
+    case "summary":
+      const rawFromHours =
+        tokens.length >= 1 ? parseSummaryHours(tokens[0]) : 1;
+      const rawToHours =
+        tokens.length >= 2 ? parseSummaryHours(tokens[1]) : 0;
+
+      if (rawFromHours === undefined || rawToHours === undefined) {
+        return { ok: false, reason: "invalid arguments" };
+      }
+
+      const normalizedFromHours = Math.max(1, rawFromHours);
+      const normalizedToHours = Math.max(0, rawToHours);
+
+      if (
+        normalizedFromHours > MAX_SUMMARY_HOURS ||
+        normalizedToHours > MAX_SUMMARY_HOURS
+      ) {
+        return { ok: false, reason: "exceeds max hours" };
+      }
+      if (normalizedFromHours <= normalizedToHours) {
+        return { ok: false, reason: "invalid arguments" };
+      }
+
+      return {
+        ok: true,
+        command: {
+          type: "summary",
+          fromHours: normalizedFromHours,
+          toHours: normalizedToHours
+        }
+      };
+    case "summaryday":
+      return {
+        ok: true,
+        command: { type: "summary", fromHours: 24, toHours: 0 }
+      };
+    case "status":
+      return { ok: true, command: { type: "status" } };
+    default:
+      return { ok: false, reason: "unknown command" };
+  }
+}
+
+function hasBotCommandAtStart(
+  message: TelegramMessage
+): message is TelegramMessage & {
+  text: string;
+  entities: TelegramMessageEntity[];
+} {
+  if (!message.text || !message.entities || message.entities.length === 0) {
+    return false;
+  }
+
+  return message.entities.some(
+    (entity) => entity.type === "bot_command" && entity.offset === 0
+  );
+}
 
 export default {
   async fetch(request, env) {
@@ -108,6 +215,13 @@ export default {
         } catch (error) {
           console.error("Failed to insert message", error);
           return new Response("internal error", { status: 500 });
+        }
+      }
+
+      if (message && hasBotCommandAtStart(message)) {
+        const commandResult = parseTelegramCommand(message.text);
+        if (!commandResult.ok) {
+          console.warn("Invalid command format", commandResult.reason);
         }
       }
 
