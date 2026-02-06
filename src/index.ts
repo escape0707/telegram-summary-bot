@@ -1,3 +1,11 @@
+import {
+  GROUP_CHAT_TYPES,
+  type TelegramMessage,
+  type TelegramMessageEntity,
+  type TelegramUpdate
+} from "./telegram/types";
+import { sendTelegramMessage } from "./telegram/api";
+
 export interface Env {
   DB: D1Database;
   AI: Ai;
@@ -8,7 +16,6 @@ export interface Env {
 const HEALTH_PATH = "/health";
 const TELEGRAM_PATH = "/telegram";
 const TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token";
-const TELEGRAM_API_BASE = "https://api.telegram.org";
 const SUMMARY_MODEL = "@cf/ibm-granite/granite-4.0-h-micro";
 const MAX_SUMMARY_HOURS = 24 * 7;
 const MAX_MESSAGES_FOR_SUMMARY = 200;
@@ -19,47 +26,6 @@ type SummaryAiMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
-
-type TelegramChatType = "private" | "group" | "supergroup" | "channel";
-
-type TelegramUser = {
-  id: number;
-  username?: string;
-};
-
-type TelegramChat = {
-  id: number;
-  type: TelegramChatType;
-  username?: string;
-};
-
-type TelegramMessage = {
-  message_id: number;
-  date: number;
-  text?: string;
-  caption?: string;
-  entities?: TelegramMessageEntity[];
-  caption_entities?: TelegramMessageEntity[];
-  from?: TelegramUser;
-  chat: TelegramChat;
-  reply_to_message?: {
-    message_id: number;
-  };
-};
-
-type TelegramMessageEntity = {
-  type: "mention" | "hashtag" | "cashtag" | "bot_command" | "url" | "email" | "phone_number" | "bold" | "italic" | "underline" | "strikethrough" | "spoiler" | "blockquote" | "expandable_blockquote" | "code" | "pre" | "text_link" | "text_mention" | "custom_emoji";
-  offset: number;
-  length: number;
-};
-
-type TelegramUpdate = {
-  update_id: number;
-  message?: TelegramMessage;
-  edited_message?: TelegramMessage;
-};
-
-const GROUP_CHAT_TYPES: TelegramChatType[] = ["group", "supergroup"];
 
 type ParsedCommand =
   | { type: "summary"; fromHours: number; toHours: number }
@@ -240,85 +206,6 @@ async function generateSummary(
 
   const trimmed = rawText.trim();
   return trimmed ? { ok: true, summary: trimmed } : { ok: false, reason: "ai_error" };
-}
-
-async function sendTelegramMessage(
-  token: string,
-  chatId: number,
-  text: string,
-  replyToMessageId: number,
-  options?: {
-    parseMode?: "MarkdownV2";
-    disableWebPagePreview?: boolean;
-  }
-): Promise<boolean> {
-  const body: Record<string, unknown> = {
-    chat_id: chatId,
-    text,
-    reply_parameters: {
-      message_id: replyToMessageId,
-      allow_sending_without_reply: true
-    }
-  };
-  if (options?.parseMode) {
-    body.parse_mode = options.parseMode;
-  }
-  if (options?.disableWebPagePreview) {
-    body.disable_web_page_preview = true;
-  }
-
-  const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Failed to sendMessage", errorText);
-
-    // Telegram rejects invalid MarkdownV2 with "can't parse entities".
-    // For reliability, retry once without parse_mode.
-    if (
-      options?.parseMode === "MarkdownV2" &&
-      /can'?t parse entities/i.test(errorText)
-    ) {
-      const fallbackBody: Record<string, unknown> = {
-        chat_id: chatId,
-        text: `Summary (unformatted):\n\n${text}`,
-        reply_parameters: {
-          message_id: replyToMessageId,
-          allow_sending_without_reply: true
-        }
-      };
-      if (options.disableWebPagePreview) {
-        fallbackBody.disable_web_page_preview = true;
-      }
-
-      const fallbackResponse = await fetch(
-        `${TELEGRAM_API_BASE}/bot${token}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(fallbackBody)
-        }
-      );
-
-      if (!fallbackResponse.ok) {
-        console.error(
-          "Failed to sendMessage (fallback)",
-          await fallbackResponse.text()
-        );
-        return false;
-      }
-
-      return true;
-    }
-
-    return false;
-  }
-
-  return true;
 }
 
 function parseSummaryHours(token: string): number | undefined {
