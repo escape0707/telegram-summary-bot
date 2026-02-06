@@ -1,16 +1,20 @@
 import {
   GROUP_CHAT_TYPES,
   type TelegramMessage,
-  type TelegramMessageEntity,
   type TelegramUpdate
 } from "./telegram/types";
 import { sendTelegramMessage } from "./telegram/api";
+import {
+  buildSummaryErrorText,
+  hasBotCommandAtStart,
+  parseTelegramCommand,
+  type SummaryCommand
+} from "./telegram/commands";
 import {
   HEALTH_PATH,
   MAX_MESSAGE_LENGTH,
   MAX_MESSAGES_FOR_SUMMARY,
   MAX_PROMPT_CHARS,
-  MAX_SUMMARY_HOURS,
   SUMMARY_MODEL,
   TELEGRAM_PATH,
   TELEGRAM_SECRET_HEADER
@@ -21,29 +25,6 @@ type SummaryAiMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
-
-type ParsedCommand =
-  | { type: "summary"; fromHours: number; toHours: number }
-  | { type: "status" };
-
-type CommandParseResult =
-  | { ok: true; command: ParsedCommand }
-  | {
-      ok: false;
-      reason: "unknown command" | "invalid arguments" | "exceeds max hours";
-    };
-
-type CommandParseErrorReason = Extract<
-  CommandParseResult,
-  { ok: false }
->["reason"];
-
-function buildSummaryErrorText(reason: CommandParseErrorReason): string {
-  if (reason === "exceeds max hours") {
-    return `Max summary window is ${MAX_SUMMARY_HOURS}h.`;
-  }
-  return `Usage: /summary [Nh [Mh]] (N=1..${MAX_SUMMARY_HOURS}, M=0..${MAX_SUMMARY_HOURS}, N > M).`;
-}
 
 type StoredMessage = {
   message_id: number;
@@ -127,7 +108,7 @@ function formatMessagesForSummary(
 async function generateSummary(
   env: Env,
   messages: StoredMessage[],
-  command: Extract<ParsedCommand, { type: "summary" }>,
+  command: SummaryCommand,
   chatUsername: string | undefined
 ): Promise<
   | { ok: true; summary: string }
@@ -201,92 +182,6 @@ async function generateSummary(
 
   const trimmed = rawText.trim();
   return trimmed ? { ok: true, summary: trimmed } : { ok: false, reason: "ai_error" };
-}
-
-function parseSummaryHours(token: string): number | undefined {
-  const trimmed = token.trim().toLowerCase();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const numericPart = trimmed.endsWith("h") ? trimmed.slice(0, -1) : trimmed;
-  if (!/^\d+$/.test(numericPart)) {
-    return undefined;
-  }
-
-  const parsed = Number(numericPart);
-  if (!Number.isFinite(parsed)) {
-    return undefined;
-  }
-  return parsed;
-}
-
-function parseTelegramCommand(text: string): CommandParseResult {
-  const trimmed = text.trim();
-  const [rawCommand, ...tokens] = trimmed.split(/\s+/);
-  const commandToken = rawCommand.replace(/^\//, "");
-  if (!commandToken) {
-    return { ok: false, reason: "unknown command" };
-  }
-
-  const command = commandToken.split("@", 1)[0].toLowerCase();
-  switch (command) {
-    case "summary":
-      const rawFromHours =
-        tokens.length >= 1 ? parseSummaryHours(tokens[0]) : 1;
-      const rawToHours =
-        tokens.length >= 2 ? parseSummaryHours(tokens[1]) : 0;
-
-      if (rawFromHours === undefined || rawToHours === undefined) {
-        return { ok: false, reason: "invalid arguments" };
-      }
-
-      const normalizedFromHours = Math.max(1, rawFromHours);
-      const normalizedToHours = Math.max(0, rawToHours);
-
-      if (
-        normalizedFromHours > MAX_SUMMARY_HOURS ||
-        normalizedToHours > MAX_SUMMARY_HOURS
-      ) {
-        return { ok: false, reason: "exceeds max hours" };
-      }
-      if (normalizedFromHours <= normalizedToHours) {
-        return { ok: false, reason: "invalid arguments" };
-      }
-
-      return {
-        ok: true,
-        command: {
-          type: "summary",
-          fromHours: normalizedFromHours,
-          toHours: normalizedToHours
-        }
-      };
-    case "summaryday":
-      return {
-        ok: true,
-        command: { type: "summary", fromHours: 24, toHours: 0 }
-      };
-    case "status":
-      return { ok: true, command: { type: "status" } };
-    default:
-      return { ok: false, reason: "unknown command" };
-  }
-}
-
-function hasBotCommandAtStart(
-  message: TelegramMessage
-): message is TelegramMessage & {
-  text: string;
-  entities: TelegramMessageEntity[];
-} {
-  if (!message.text || !message.entities || message.entities.length === 0) {
-    return false;
-  }
-
-  return message.entities.some(
-    (entity) => entity.type === "bot_command" && entity.offset === 0
-  );
 }
 
 export default {
