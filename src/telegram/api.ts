@@ -41,7 +41,7 @@ export async function sendTelegramMessage(
     // For reliability, retry once without parse_mode.
     if (
       options?.parseMode === "MarkdownV2" &&
-      /can'?t parse entities/i.test(errorText)
+      /can't parse entities/i.test(errorText)
     ) {
       const fallbackBody: Record<string, unknown> = {
         chat_id: chatId,
@@ -80,4 +80,3 @@ export async function sendTelegramMessage(
 
   return true;
 }
-
