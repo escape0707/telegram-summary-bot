@@ -1,0 +1,67 @@
+import { MAX_MESSAGES_FOR_SUMMARY } from "../config";
+import type { Env } from "../env";
+
+export type StoredMessage = {
+  message_id: number;
+  user_id: number | null;
+  username: string | null;
+  text: string | null;
+  ts: number;
+};
+
+export type MessageInsert = {
+  chatId: number;
+  chatUsername: string | null;
+  messageId: number;
+  userId: number | null;
+  username: string | null;
+  text: string | null;
+  ts: number;
+  replyToMessageId: number | null;
+};
+
+export async function insertMessage(env: Env, message: MessageInsert): Promise<void> {
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO messages (
+      chat_id,
+      chat_username,
+      message_id,
+      user_id,
+      username,
+      text,
+      ts,
+      reply_to_message_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      message.chatId,
+      message.chatUsername,
+      message.messageId,
+      message.userId,
+      message.username,
+      message.text,
+      message.ts,
+      message.replyToMessageId
+    )
+    .run();
+}
+
+export async function loadMessagesForSummary(
+  env: Env,
+  chatId: number,
+  windowStart: number,
+  windowEnd: number
+): Promise<StoredMessage[]> {
+  const result = await env.DB.prepare(
+    `SELECT message_id, user_id, username, text, ts
+     FROM messages
+     WHERE chat_id = ? AND ts BETWEEN ? AND ?
+     ORDER BY ts DESC
+     LIMIT ${MAX_MESSAGES_FOR_SUMMARY}`
+  )
+    .bind(chatId, windowStart, windowEnd)
+    .all<StoredMessage>();
+
+  return (result.results ?? []) as StoredMessage[];
+}
+

@@ -11,9 +11,13 @@ import {
   type SummaryCommand
 } from "./telegram/commands";
 import {
+  insertMessage,
+  loadMessagesForSummary,
+  type StoredMessage
+} from "./db/messages";
+import {
   HEALTH_PATH,
   MAX_MESSAGE_LENGTH,
-  MAX_MESSAGES_FOR_SUMMARY,
   MAX_PROMPT_CHARS,
   SUMMARY_MODEL,
   TELEGRAM_PATH,
@@ -24,14 +28,6 @@ import type { Env } from "./env";
 type SummaryAiMessage = {
   role: "system" | "user" | "assistant";
   content: string;
-};
-
-type StoredMessage = {
-  message_id: number;
-  user_id: number | null;
-  username: string | null;
-  text: string | null;
-  ts: number;
 };
 
 function extractWorkersAiText(result: unknown): string | undefined {
@@ -45,25 +41,6 @@ function extractWorkersAiText(result: unknown): string | undefined {
 
   const content = record.choices?.[0]?.message?.content;
   return typeof content === "string" ? content : undefined;
-}
-
-async function loadMessagesForSummary(
-  env: Env,
-  chatId: number,
-  windowStart: number,
-  windowEnd: number
-): Promise<StoredMessage[]> {
-  const result = await env.DB.prepare(
-    `SELECT message_id, user_id, username, text, ts
-     FROM messages
-     WHERE chat_id = ? AND ts BETWEEN ? AND ?
-     ORDER BY ts DESC
-     LIMIT ${MAX_MESSAGES_FOR_SUMMARY}`
-  )
-    .bind(chatId, windowStart, windowEnd)
-    .all<StoredMessage>();
-
-  return (result.results ?? []) as StoredMessage[];
 }
 
 function formatMessagesForSummary(
@@ -226,29 +203,16 @@ export default {
         const chatUsername = message.chat.username ?? null;
 
         try {
-          await env.DB.prepare(
-            `INSERT OR IGNORE INTO messages (
-              chat_id,
-              chat_username,
-              message_id,
-              user_id,
-              username,
-              text,
-              ts,
-              reply_to_message_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          )
-            .bind(
-              message.chat.id,
-              chatUsername,
-              message.message_id,
-              userId,
-              username,
-              text,
-              message.date,
-              replyToMessageId
-            )
-            .run();
+          await insertMessage(env, {
+            chatId: message.chat.id,
+            chatUsername,
+            messageId: message.message_id,
+            userId,
+            username,
+            text,
+            ts: message.date,
+            replyToMessageId
+          });
         } catch (error) {
           console.error("Failed to insert message", error);
           return new Response("internal error", { status: 500 });
