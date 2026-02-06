@@ -1,5 +1,6 @@
 export interface Env {
   DB: D1Database;
+  AI: Ai;
   TELEGRAM_WEBHOOK_SECRET: string;
   TELEGRAM_BOT_TOKEN: string;
 }
@@ -8,6 +9,16 @@ const HEALTH_PATH = "/health";
 const TELEGRAM_PATH = "/telegram";
 const TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token";
 const TELEGRAM_API_BASE = "https://api.telegram.org";
+const SUMMARY_MODEL = "@cf/ibm-granite/granite-4.0-h-micro";
+const MAX_SUMMARY_HOURS = 24 * 7;
+const MAX_MESSAGES_FOR_SUMMARY = 200;
+const MAX_MESSAGE_LENGTH = 280;
+const MAX_PROMPT_CHARS = 8000;
+
+type SummaryAiMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
 
 type TelegramChatType = "private" | "group" | "supergroup" | "channel";
 
@@ -66,15 +77,6 @@ type CommandParseErrorReason = Extract<
   { ok: false }
 >["reason"];
 
-const MAX_SUMMARY_HOURS = 24 * 7;
-
-function buildSummaryStubText(command: Extract<ParsedCommand, { type: "summary" }>): string {
-  if (command.toHours === 0) {
-    return `Summary for the last ${command.fromHours}h is not implemented yet.`;
-  }
-  return `Summary for ${command.fromHours}h to ${command.toHours}h ago is not implemented yet.`;
-}
-
 function buildSummaryErrorText(reason: CommandParseErrorReason): string {
   if (reason === "exceeds max hours") {
     return `Max summary window is ${MAX_SUMMARY_HOURS}h.`;
@@ -82,27 +84,237 @@ function buildSummaryErrorText(reason: CommandParseErrorReason): string {
   return `Usage: /summary [Nh [Mh]] (N=1..${MAX_SUMMARY_HOURS}, M=0..${MAX_SUMMARY_HOURS}, N > M).`;
 }
 
+type StoredMessage = {
+  message_id: number;
+  user_id: number | null;
+  username: string | null;
+  text: string | null;
+  ts: number;
+};
+
+function extractWorkersAiText(result: unknown): string | undefined {
+  if (!result || typeof result !== "object") return undefined;
+
+  // Observed Granite output (wrangler tail):
+  // { choices: [{ message: { content: "..." } }] }
+  const record = result as {
+    choices?: Array<{ message?: { content?: unknown } }>;
+  };
+
+  const content = record.choices?.[0]?.message?.content;
+  return typeof content === "string" ? content : undefined;
+}
+
+async function loadMessagesForSummary(
+  env: Env,
+  chatId: number,
+  windowStart: number,
+  windowEnd: number
+): Promise<StoredMessage[]> {
+  const result = await env.DB.prepare(
+    `SELECT message_id, user_id, username, text, ts
+     FROM messages
+     WHERE chat_id = ? AND ts BETWEEN ? AND ?
+     ORDER BY ts DESC
+     LIMIT ${MAX_MESSAGES_FOR_SUMMARY}`
+  )
+    .bind(chatId, windowStart, windowEnd)
+    .all<StoredMessage>();
+
+  return (result.results ?? []) as StoredMessage[];
+}
+
+function formatMessagesForSummary(
+  messages: StoredMessage[],
+  chatUsername: string | undefined
+): string {
+  let usedChars = 0;
+  const lines: string[] = [];
+
+  for (const message of messages) {
+    if (!message.text) {
+      continue;
+    }
+
+    const userToken = message.user_id !== null ? `user:${message.user_id}` : undefined;
+    const displayName = message.username ? `@${message.username}` : userToken ?? "unknown";
+    const author =
+      userToken && displayName !== userToken
+        ? `${displayName} (${userToken})`
+        : displayName;
+    const cleaned = message.text.replace(/\s+/g, " ").trim();
+    if (!cleaned) {
+      continue;
+    }
+    const clipped = cleaned.slice(0, MAX_MESSAGE_LENGTH);
+    const source = chatUsername
+      ? `https://t.me/${chatUsername}/${message.message_id}`
+      : `message:${message.message_id}`;
+    const line = `- ${author}: ${clipped} (${source})`;
+
+    if (usedChars + line.length + 1 > MAX_PROMPT_CHARS) {
+      break;
+    }
+
+    lines.push(line);
+    usedChars += line.length + 1;
+  }
+
+  return lines.join("\n");
+}
+
+async function generateSummary(
+  env: Env,
+  messages: StoredMessage[],
+  command: Extract<ParsedCommand, { type: "summary" }>,
+  chatUsername: string | undefined
+): Promise<
+  | { ok: true; summary: string }
+  | { ok: false; reason: "no_text" | "ai_error" }
+> {
+  const content = formatMessagesForSummary(messages, chatUsername);
+  if (!content) {
+    return { ok: false, reason: "no_text" };
+  }
+
+  const windowText =
+    command.toHours === 0
+      ? `the last ${command.fromHours} hours`
+      : `${command.fromHours} to ${command.toHours} hours ago`;
+
+  const messagesPrompt: SummaryAiMessage[] = [
+    {
+      role: "system",
+      content:
+        [
+          "You summarize Telegram group chats by clustering messages into topics.",
+          "",
+          "Return 3-7 bullet points formatted as Telegram MarkdownV2, and nothing else.",
+          "",
+          "Exact output format (one bullet per line):",
+          "• *Topic*: [@alice](tg://user?id=123) and [user:456](tg://user?id=456) talked about XXXX [1](URL) [2](URL)",
+          "",
+          "Input format notes:",
+          "- Each input message line ends with a source URL in parentheses: (https://t.me/<chat>/<message_id>)",
+          "- The author prefix is either '@username (user:<id>)' or 'user:<id>' if no username is available",
+          "- Use the numeric <id> from user:<id> when building tg://user?id=<id> links",
+          "",
+          "Rules:",
+          "- Each bullet must start with '• ' (do NOT use '-' bullets).",
+          "- Use single-asterisk bold for the topic name (e.g. *Topic*). Do NOT use '**bold**'.",
+          "- After the colon, start with 1-3 clickable participant mentions, then the summary text.",
+          "- Always mention participants as inline links like [username](tg://user?id=user_id).",
+          "- Use the username from the input as the link text if available (e.g. @alice). If a user has no username, use user:<id> as the link text.",
+          "- Use only user ids that appear in the input as (user:<id>). Do NOT invent ids or usernames.",
+          "- Do NOT use the hyphen character '-' anywhere in the bullet text. Rewrite hyphenated phrases using spaces (e.g. 'LLM-based' => 'LLM based').",
+          "- End each bullet with 1-3 inline links like [1](URL). Use only URLs from the input (they appear in parentheses at the end of each message line).",
+          "- Do not show raw URLs outside the [n](URL) links.",
+          "- Do not put URLs in parentheses like (https://...). Only use the [n](URL) inline link format.",
+          "- MarkdownV2 escaping: in the bullet text (everything except inside the (URL) part of links), escape these characters with a backslash: _ * [ ] ( ) ~ ` > # + - = | { } . !",
+          "- Avoid '.' and '!' entirely if possible (do not end bullets with punctuation).",
+          "- Mention who said what, but prefer paraphrasing over quoting raw message text to reduce escaping errors.",
+          "- Do not invent details."
+        ].join("\n")
+    },
+    {
+      role: "user",
+      content: `Messages from ${windowText}:\n\n${content}`
+    }
+  ];
+
+  let result: unknown;
+  try {
+    result = await env.AI.run(SUMMARY_MODEL, {
+      messages: messagesPrompt
+    });
+  } catch (error) {
+    console.error("Workers AI run failed", error);
+    return { ok: false, reason: "ai_error" };
+  }
+
+  const rawText = extractWorkersAiText(result);
+  if (rawText === undefined) {
+    console.error("Unexpected Workers AI output format", result);
+    return { ok: false, reason: "ai_error" };
+  }
+
+  const trimmed = rawText.trim();
+  return trimmed ? { ok: true, summary: trimmed } : { ok: false, reason: "ai_error" };
+}
+
 async function sendTelegramMessage(
   token: string,
   chatId: number,
   text: string,
-  replyToMessageId: number
+  replyToMessageId: number,
+  options?: {
+    parseMode?: "MarkdownV2";
+    disableWebPagePreview?: boolean;
+  }
 ): Promise<boolean> {
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    text,
+    reply_parameters: {
+      message_id: replyToMessageId,
+      allow_sending_without_reply: true
+    }
+  };
+  if (options?.parseMode) {
+    body.parse_mode = options.parseMode;
+  }
+  if (options?.disableWebPagePreview) {
+    body.disable_web_page_preview = true;
+  }
+
   const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      reply_parameters: {
-        message_id: replyToMessageId,
-        allow_sending_without_reply: true
-      }
-    })
+    body: JSON.stringify(body)
   });
 
   if (!response.ok) {
-    console.error("Failed to sendMessage", await response.text());
+    const errorText = await response.text();
+    console.error("Failed to sendMessage", errorText);
+
+    // Telegram rejects invalid MarkdownV2 with "can't parse entities".
+    // For reliability, retry once without parse_mode.
+    if (
+      options?.parseMode === "MarkdownV2" &&
+      /can'?t parse entities/i.test(errorText)
+    ) {
+      const fallbackBody: Record<string, unknown> = {
+        chat_id: chatId,
+        text: `Summary (unformatted):\n\n${text}`,
+        reply_parameters: {
+          message_id: replyToMessageId,
+          allow_sending_without_reply: true
+        }
+      };
+      if (options.disableWebPagePreview) {
+        fallbackBody.disable_web_page_preview = true;
+      }
+
+      const fallbackResponse = await fetch(
+        `${TELEGRAM_API_BASE}/bot${token}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(fallbackBody)
+        }
+      );
+
+      if (!fallbackResponse.ok) {
+        console.error(
+          "Failed to sendMessage (fallback)",
+          await fallbackResponse.text()
+        );
+        return false;
+      }
+
+      return true;
+    }
+
     return false;
   }
 
@@ -269,10 +481,49 @@ export default {
       if (message && hasBotCommandAtStart(message)) {
         const commandResult = parseTelegramCommand(message.text);
         let replyText: string | undefined;
+        let replyParseMode: "MarkdownV2" | undefined;
 
         if (commandResult.ok) {
           if (commandResult.command.type === "summary") {
-            replyText = buildSummaryStubText(commandResult.command);
+            const windowStart =
+              message.date - commandResult.command.fromHours * 60 * 60;
+            const windowEnd =
+              message.date - commandResult.command.toHours * 60 * 60;
+
+            let rows: StoredMessage[];
+            try {
+              rows = await loadMessagesForSummary(
+                env,
+                message.chat.id,
+                windowStart,
+                windowEnd
+              );
+            } catch (error) {
+              console.error("Failed to load messages for summary", error);
+              replyText = "Failed to load messages for summary.";
+              rows = [];
+            }
+
+            if (!replyText) {
+              if (rows.length === 0) {
+                replyText = "No messages found in that window.";
+              } else {
+                const summaryResult = await generateSummary(
+                  env,
+                  rows.slice().reverse(),
+                  commandResult.command,
+                  message.chat.username
+                );
+                if (summaryResult.ok) {
+                  replyText = summaryResult.summary;
+                  replyParseMode = "MarkdownV2";
+                } else if (summaryResult.reason === "no_text") {
+                  replyText = "No text messages found in that window.";
+                } else {
+                  replyText = "Failed to generate summary (check logs).";
+                }
+              }
+            }
           }
         } else {
           if (commandResult.reason !== "unknown command") {
@@ -292,7 +543,10 @@ export default {
             botToken,
             message.chat.id,
             replyText,
-            message.message_id
+            message.message_id,
+            replyParseMode
+              ? { parseMode: replyParseMode, disableWebPagePreview: true }
+              : undefined
           );
           if (!sent) {
             return new Response("internal error", { status: 502 });

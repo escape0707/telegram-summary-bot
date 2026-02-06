@@ -10,7 +10,7 @@ ongoing cost and operational burden.
 - Ingest and store Telegram group messages (timestamp, author, text, message link).
 - Provide on-demand summaries for last 1h, last 24h, and custom time windows.
 - Post daily summary at 17:00 JST (08:00 UTC) to each group the bot is in.
-- Summaries include participants and a link to at least one message per topic.
+- Summaries cluster messages by topic first, then mention who said what with message links.
 - Expose service status/usage stats (uptime, error counts, DB usage where possible).
 - Run on Cloudflare Workers + D1 + Workers AI free tiers.
 
@@ -34,7 +34,7 @@ ongoing cost and operational burden.
   - If command: fetch messages in requested window, summarize via Workers AI, reply.
 - Cloudflare Cron Trigger runs daily at 08:00 UTC:
   - For each group with recent activity, summarize last 24h and post to group.
-- Workers AI: summarization prompt produces list items with participants + message links.
+- Workers AI: use `@cf/ibm-granite/granite-4.0-h-micro` with chat-style `messages` to cluster messages by topic and attribute who said what with message links.
 - D1 stores:
   - messages: chat_id, chat_username, message_id, user_id, username, text, ts, reply_to.
   - summaries: chat_id, window_start, window_end, summary_text, ts.
@@ -46,8 +46,8 @@ ongoing cost and operational burden.
   - /summary [Nh [Mh]] (N defaults to 1 and 0 is treated as 1; Mh defaults to 0; N, M = 0..168, N > M; 'h' is optional)
   - /summaryday (alias of /summary 24h)
   - /status
-- Summary format (example):
-  - "@user1, @user2 discussed [topic](https://t.me/<group>/<message_id>) about XXXXX"
+- Summary format (example of one topic cluster):
+  - "<topic>: @user1 [says](https://t.me/<group>/<message_id>) XXXXX; @user2 [adds](https://t.me/<group>/<message_id>) YYYYY; @user3 [agrees](https://t.me/<group>/<message_id>)."
 - Message link format for public groups:
   - https://t.me/<group_username>/<message_id>
 
@@ -76,7 +76,8 @@ ongoing cost and operational burden.
 - Local dev: wrangler dev and webhook test with curl or Telegram test updates.
 - Manual tests:
   - Post messages in a group and verify D1 inserts.
-  - /summary_1h and /summary_24h produce a response.
+  - /summary, /summary 3h and /summaryday produce a response.
+  - /summary 4h 1h returns a range summary.
   - Daily cron simulated (triggered manually) posts summary.
   - /status returns uptime + error counts.
 
