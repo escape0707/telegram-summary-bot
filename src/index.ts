@@ -5,22 +5,17 @@ import {
   type TelegramUpdate
 } from "./telegram/types";
 import { sendTelegramMessage } from "./telegram/api";
-
-export interface Env {
-  DB: D1Database;
-  AI: Ai;
-  TELEGRAM_WEBHOOK_SECRET: string;
-  TELEGRAM_BOT_TOKEN: string;
-}
-
-const HEALTH_PATH = "/health";
-const TELEGRAM_PATH = "/telegram";
-const TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token";
-const SUMMARY_MODEL = "@cf/ibm-granite/granite-4.0-h-micro";
-const MAX_SUMMARY_HOURS = 24 * 7;
-const MAX_MESSAGES_FOR_SUMMARY = 200;
-const MAX_MESSAGE_LENGTH = 280;
-const MAX_PROMPT_CHARS = 8000;
+import {
+  HEALTH_PATH,
+  MAX_MESSAGE_LENGTH,
+  MAX_MESSAGES_FOR_SUMMARY,
+  MAX_PROMPT_CHARS,
+  MAX_SUMMARY_HOURS,
+  SUMMARY_MODEL,
+  TELEGRAM_PATH,
+  TELEGRAM_SECRET_HEADER
+} from "./config";
+import type { Env } from "./env";
 
 type SummaryAiMessage = {
   role: "system" | "user" | "assistant";
