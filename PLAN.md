@@ -2,20 +2,16 @@
 
 ## Problem / Motivation
 
-Build a Telegram group-summary bot and ship a usable product.
-The bot logs group messages, generates LLM summaries, posts daily summaries at 17:00 JST,
-and exposes status/usage commands. It must run on Cloudflare free tier with minimal
-ongoing cost and operational burden.
+Build a Telegram group-summary bot: ingest group messages, generate LLM summaries, post
+daily summaries at 17:00 JST (08:00 UTC), and expose status/usage commands. It must run
+on Cloudflare free tiers with minimal ongoing cost and operational burden.
 
 ## Goals
 
-- Ingest and store Telegram group messages (timestamp, author, text, message link).
+- Ingest and store Telegram group messages (timestamp, author, text, and identifiers to build message/user links).
 - Provide on-demand summaries for last 1h, last 24h, and custom time windows.
 - Post daily summary at 17:00 JST (08:00 UTC) to each group the bot is in.
-- Summaries cluster messages by topic, then for each topic cluster output SVO entries:
-  - Subject: clickable user link
-  - Verb: a verb like "says", "adds", "agrees", "disagrees", etc, as a clickable message link
-  - Object: a short summary of what they said
+- Summaries cluster messages by topic, then output SVO entries per topic (Subject=user link; Verb=message link; Object=short summary).
 - Expose service status/usage stats (uptime, error counts, DB usage where possible).
 - Run on Cloudflare Workers + D1 + Workers AI free tiers.
 
@@ -31,14 +27,13 @@ ongoing cost and operational burden.
 - Bot is added to groups and set as admin; privacy mode disabled.
 - No data retention limit for now (messages stored indefinitely).
 - Free-tier limits must be respected: Workers, D1, Workers AI.
-- Daily summary time is fixed at 17:00 JST for now. Maybe in the future we can add a per group setting command.
+- Daily summary time is fixed at 17:00 JST for now (future: per-group setting).
 
 ## Proposed Design (Components + Data Flow)
 
 - Cloudflare Worker HTTP endpoint receives Telegram webhook updates.
-- Worker parses updates:
-  - If message event: store in D1.
-  - If command: fetch messages in requested window, summarize via Workers AI, reply.
+  - Message event: store in D1.
+  - Command: fetch messages in requested window, summarize via Workers AI, reply.
 - Cloudflare Cron Trigger runs daily at 08:00 UTC:
   - For each group with recent activity, summarize last 24h and post to group.
 - Workers AI: use `@cf/ibm-granite/granite-4.0-h-micro` with chat-style `messages` to do topic clustering and reply formatting by prompt engineering.
@@ -51,12 +46,12 @@ ongoing cost and operational burden.
 
 - Telegram webhook: POST /telegram (set via setWebhook).
 - Commands:
-  - /summary [Nh [Mh]] (N defaults to 1 and 0 is treated as 1; M defaults to 0; N, M = 0..168, N > M; 'h' is optional)
+  - /summary [Nh [Mh]] (N defaults to 1, 0 treated as 1; M defaults to 0; N,M in 0..168; require N > M; optional 'h')
   - /summaryday (alias of /summary 24h)
   - /status
 - Summary format (for one topic cluster):
-  - topic, then SVO (Subject-Verb-Object) format. Subject is clickable user link. Verb is a verb like "says", "adds", "agrees", "disagrees", etc, with clickable message link. Object is a summary about what they said.
-  - For example (Telegram HTML, TSX-style placeholders):
+  - Topic, then SVO (Subject-Verb-Object) entries: Subject is a clickable user link; Verb is clickable message link text (e.g. says/adds/agrees/disagrees); Object is a short summary.
+  - Example (Telegram HTML, TSX-style placeholders):
 
     ```tsx
     <b>{topic}</b>: {userLink1} {messageLink1} {obj1}; {userLink2} {messageLink2} {obj2}; {userLink3} {messageLink3} {obj3}.
@@ -65,29 +60,22 @@ ongoing cost and operational burden.
   - User link format for users:
 
     ```tsx
-    // With username:
-    <a href={`https://t.me/${username}`}>@{username}</a>
-
-    // Without username:
-    <a href={`tg://user?id=${userId}`}>user:{userId}</a>
+    const userLink = username
+      ? <a href={`https://t.me/${username}`}>@{username}</a>
+      : <a href={`tg://user?id=${userId}`}>user:{userId}</a>;
     ```
 
   - Message link format:
 
     ```tsx
-    // Chat with chat username:
-    <a href={`https://t.me/${chatUsername}/${messageId}`}>says/adds/agrees/etc</a>
-
-    // Chat without chat username:
-    <a href={`https://t.me/c/${internalChatId}/${messageId}`}>says/adds/agrees/etc</a>
-
-    // Derive internalChatId from the Bot API chatId using Telegram's documented ID conversions:
-    // - Supergroup/channel dialog ids are in the -100... range:
-    //   internalChatId = -chatId - 1_000_000_000_000
-    // - (Basic) group chat dialog ids are negative but not in the -100... range:
-    //   internalChatId = -chatId
     const internalChatId =
       chatId <= -1_000_000_000_000 ? -chatId - 1_000_000_000_000 : -chatId;
+
+    const messageUrl = chatUsername
+      ? `https://t.me/${chatUsername}/${messageId}`
+      : `https://t.me/c/${internalChatId}/${messageId}`;
+
+    const messageLink = <a href={messageUrl}>says/adds/agrees/etc</a>;
     ```
 
 ## Step Plan (Commit-Sized)
@@ -102,7 +90,7 @@ ongoing cost and operational burden.
 - [x] feat: command parsing + window parsing
 - [x] feat: summary command (stub response)
 - [ ] feat: workers-ai summarization (shared pipeline) (without format instruction prompt engineering)
-- [ ] feat: prompt engineer the summary formatting with topic + participants with link + short summarization + message links
+- [ ] feat: prompt engineer HTML SVO formatting (topic clusters + user/message links)
 - [ ] feat: cron trigger + daily summary dispatch
 - [ ] feat: status/usage command
 - [ ] feat: error tracking + alerting
