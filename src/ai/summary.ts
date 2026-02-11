@@ -6,6 +6,10 @@ import {
 import type { Env } from "../env";
 import type { StoredMessage } from "../db/messages";
 import type { SummaryCommand } from "../telegram/commands";
+import {
+  buildTelegramMessageUrl,
+  buildTelegramUserLink
+} from "../telegram/links";
 
 type SummaryAiMessage = {
   role: "system" | "user" | "assistant";
@@ -27,6 +31,7 @@ function extractWorkersAiText(result: unknown): string | undefined {
 
 function formatMessagesForSummary(
   messages: StoredMessage[],
+  chatId: number,
   chatUsername: string | undefined
 ): string {
   let usedChars = 0;
@@ -37,22 +42,28 @@ function formatMessagesForSummary(
       continue;
     }
 
-    const userToken =
-      message.user_id !== null ? `user:${message.user_id}` : undefined;
-    const displayName = message.username ? `@${message.username}` : userToken ?? "unknown";
-    const author =
-      userToken && displayName !== userToken
-        ? `${displayName} (${userToken})`
-        : displayName;
     const cleaned = message.text.replace(/\s+/g, " ").trim();
     if (!cleaned) {
       continue;
     }
+
+    const userLink = buildTelegramUserLink({
+      username: message.username ?? undefined,
+      userId: message.user_id ?? undefined
+    });
+
     const clipped = cleaned.slice(0, MAX_MESSAGE_LENGTH);
-    const source = chatUsername
-      ? `https://t.me/${chatUsername}/${message.message_id}`
-      : `message:${message.message_id}`;
-    const line = `- ${author}: ${clipped} (${source})`;
+    const messageUrl = buildTelegramMessageUrl({
+      chatId,
+      chatUsername,
+      messageId: message.message_id
+    });
+    const line = `- ${JSON.stringify({
+      user_label: userLink?.label ?? "unknown",
+      user_url: userLink?.url ?? "unknown",
+      message_url: messageUrl,
+      text: clipped
+    })}`;
 
     if (usedChars + line.length + 1 > MAX_PROMPT_CHARS) {
       break;
@@ -69,12 +80,13 @@ export async function generateSummary(
   env: Env,
   messages: StoredMessage[],
   command: SummaryCommand,
+  chatId: number,
   chatUsername: string | undefined
 ): Promise<
   | { ok: true; summary: string }
   | { ok: false; reason: "no_text" | "ai_error" }
 > {
-  const content = formatMessagesForSummary(messages, chatUsername);
+  const content = formatMessagesForSummary(messages, chatId, chatUsername);
   if (!content) {
     return { ok: false, reason: "no_text" };
   }
@@ -91,30 +103,30 @@ export async function generateSummary(
         [
           "You summarize Telegram group chats by clustering messages into topics.",
           "",
-          "Return 3-7 bullet points formatted as Telegram MarkdownV2, and nothing else.",
+          "Return Telegram HTML only (no Markdown, no code fences, no extra prose).",
           "",
-          "Exact output format (one bullet per line):",
-          "• *Topic*: [@alice](tg://user?id=123) and [user:456](tg://user?id=456) talked about XXXX [1](URL) [2](URL)",
+          "Output format (one topic per line):",
+          "<b>Topic</b>: <a href=\"USER_URL\">USER_LABEL</a> <a href=\"MESSAGE_URL\">VERB</a> object; <a href=\"USER_URL\">USER_LABEL</a> <a href=\"MESSAGE_URL\">VERB</a> object",
           "",
           "Input format notes:",
-          "- Each input message line ends with a source URL in parentheses: (https://t.me/<chat>/<message_id>)",
-          "- The author prefix is either '@username (user:<id>)' or 'user:<id>' if no username is available",
-          "- Use the numeric <id> from user:<id> when building tg://user?id=<id> links",
+          "- Each input message line is a JSON object after '- ' with fields: user_label, user_url, message_url, text",
+          "- user_url is precomputed and is either https://t.me/<username>, tg://user?id=<id>, or 'unknown'",
           "",
           "Rules:",
-          "- Each bullet must start with '• ' (do NOT use '-' bullets).",
-          "- Use single-asterisk bold for the topic name (e.g. *Topic*). Do NOT use '**bold**'.",
-          "- After the colon, start with 1-3 clickable participant mentions, then the summary text.",
-          "- Always mention participants as inline links like [username](tg://user?id=user_id).",
-          "- Use the username from the input as the link text if available (e.g. @alice). If a user has no username, use user:<id> as the link text.",
-          "- Use only user ids that appear in the input as (user:<id>). Do NOT invent ids or usernames.",
-          "- Do NOT use the hyphen character '-' anywhere in the bullet text. Rewrite hyphenated phrases using spaces (e.g. 'LLM-based' => 'LLM based').",
-          "- End each bullet with 1-3 inline links like [1](URL). Use only URLs from the input (they appear in parentheses at the end of each message line).",
-          "- Do not show raw URLs outside the [n](URL) links.",
-          "- Do not put URLs in parentheses like (https://...). Only use the [n](URL) inline link format.",
-          "- MarkdownV2 escaping: in the bullet text (everything except inside the (URL) part of links), escape these characters with a backslash: _ * [ ] ( ) ~ ` > # + - = | { } . !",
-          "- Avoid '.' and '!' entirely if possible (do not end bullets with punctuation).",
-          "- Mention who said what, but prefer paraphrasing over quoting raw message text to reduce escaping errors.",
+          "- Produce 2-6 topic lines.",
+          "- Each line starts with <b>topic</b>:",
+          "- After the colon, provide 1-4 SVO entries separated by '; '.",
+          "- SVO entry format: <a href=\"USER_URL\">USER_LABEL</a> <a href=\"MESSAGE_URL\">VERB</a> OBJECT",
+          "- USER_LABEL and USER_URL must be copied exactly from input user_label and user_url values.",
+          "- If user_url is 'unknown', do not include that user as a participant.",
+          "- MESSAGE_URL must be copied from input message_url values; never invent URLs.",
+          "- VERB must be short and human (for example: says, adds, asks, agrees, disagrees, reports, clarifies, suggests).",
+          "- OBJECT is a short paraphrase of what was said.",
+          "- Mention who said what, but prefer paraphrasing over quoting raw message text.",
+          "- Use only participant labels/urls from the input. Do NOT invent participants.",
+          "- Escape '&', '<', and '>' in topic/object text using HTML entities.",
+          "- Do not include raw URLs outside href attributes.",
+          "- Do not use Markdown syntax anywhere.",
           "- Do not invent details."
         ].join("\n")
     },
@@ -145,4 +157,3 @@ export async function generateSummary(
     ? { ok: true, summary: trimmed }
     : { ok: false, reason: "ai_error" };
 }
-

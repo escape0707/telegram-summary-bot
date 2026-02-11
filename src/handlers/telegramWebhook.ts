@@ -92,7 +92,6 @@ async function maybeHandleCommand(
 ): Promise<Response | undefined> {
   const commandResult = parseTelegramCommand(message.text);
   let replyText: string | undefined;
-  let replyParseMode: "MarkdownV2" | undefined;
 
   if (commandResult.ok) {
     if (commandResult.command.type === "summary") {
@@ -123,11 +122,11 @@ async function maybeHandleCommand(
             env,
             rows.slice().reverse(),
             commandResult.command,
+            message.chat.id,
             message.chat.username
           );
           if (summaryResult.ok) {
             replyText = summaryResult.summary;
-            replyParseMode = "MarkdownV2";
           } else if (summaryResult.reason === "no_text") {
             replyText = "No text messages found in that window.";
           } else {
@@ -157,10 +156,7 @@ async function maybeHandleCommand(
     botToken,
     message.chat.id,
     replyText,
-    message.message_id,
-    replyParseMode
-      ? { parseMode: replyParseMode, disableWebPagePreview: true }
-      : undefined
+    message.message_id
   );
   if (!sent) {
     return new Response("internal error", { status: 502 });
