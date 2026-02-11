@@ -48,19 +48,18 @@ export async function handleTelegramWebhook(
   }
 
   const message = update.message ?? update.edited_message;
-  if (message && GROUP_CHAT_TYPES.includes(message.chat.type)) {
+
+  if (message && hasBotCommandAtStart(message)) {
+    const response = await tryHandleCommand(env, message);
+    if (response) {
+      return response;
+    }
+  } else if (message && GROUP_CHAT_TYPES.includes(message.chat.type)) {
     try {
       await ingestMessage(env, message);
     } catch (error) {
       console.error("Failed to insert message", error);
       return new Response("internal error", { status: 500 });
-    }
-  }
-
-  if (message && hasBotCommandAtStart(message)) {
-    const response = await maybeHandleCommand(env, message);
-    if (response) {
-      return response;
     }
   }
 
@@ -86,7 +85,7 @@ async function ingestMessage(env: Env, message: TelegramMessage): Promise<void> 
   });
 }
 
-async function maybeHandleCommand(
+async function tryHandleCommand(
   env: Env,
   message: TelegramMessage & { text: string }
 ): Promise<Response | undefined> {

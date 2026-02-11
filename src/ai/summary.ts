@@ -16,14 +16,22 @@ type SummaryAiMessage = {
   content: string;
 };
 
+const SUMMARY_MAX_TOKENS = 800;
+
 function extractWorkersAiText(result: unknown): string | undefined {
   if (!result || typeof result !== "object") return undefined;
 
-  // Observed Granite output (wrangler tail):
-  // { choices: [{ message: { content: "..." } }] }
+  // Observed outputs:
+  // - Granite: { choices: [{ message: { content: "..." } }] }
+  // - Mistral: { response: "..." }
   const record = result as {
+    response?: unknown;
     choices?: Array<{ message?: { content?: unknown } }>;
   };
+
+  if (typeof record.response === "string") {
+    return record.response;
+  }
 
   const content = record.choices?.[0]?.message?.content;
   return typeof content === "string" ? content : undefined;
@@ -59,8 +67,8 @@ function formatMessagesForSummary(
       messageId: message.message_id
     });
     const line = `- ${JSON.stringify({
-      user_label: userLink?.label ?? "unknown",
-      user_url: userLink?.url ?? "unknown",
+      user_label: userLink.label,
+      user_url: userLink.url,
       message_url: messageUrl,
       text: clipped
     })}`;
@@ -101,33 +109,24 @@ export async function generateSummary(
       role: "system",
       content:
         [
-          "You summarize Telegram group chats by clustering messages into topics.",
+          "You summarize Telegram group chats into topic clusters.",
+          "Return ONLY Telegram HTML (no Markdown, no code fences, no commentary).",
           "",
-          "Return Telegram HTML only (no Markdown, no code fences, no extra prose).",
+          "Input lines are JSON objects after '- ' with fields:",
+          "user_label, user_url, message_url, text",
           "",
-          "Output format (one topic per line):",
-          "<b>Topic</b>: <a href=\"USER_URL\">USER_LABEL</a> <a href=\"MESSAGE_URL\">VERB</a> object; <a href=\"USER_URL\">USER_LABEL</a> <a href=\"MESSAGE_URL\">VERB</a> object",
+          "Write 2-6 lines. Each line format:",
+          "<b>TOPIC</b>: <a href=\"USER_URL\">USER_LABEL</a> <a href=\"MESSAGE_URL\">VERB</a> OBJECT; ...",
           "",
-          "Input format notes:",
-          "- Each input message line is a JSON object after '- ' with fields: user_label, user_url, message_url, text",
-          "- user_url is precomputed and is either https://t.me/<username>, tg://user?id=<id>, or 'unknown'",
-          "",
-          "Rules:",
-          "- Produce 2-6 topic lines.",
-          "- Each line starts with <b>topic</b>:",
-          "- After the colon, provide 1-4 SVO entries separated by '; '.",
-          "- SVO entry format: <a href=\"USER_URL\">USER_LABEL</a> <a href=\"MESSAGE_URL\">VERB</a> OBJECT",
-          "- USER_LABEL and USER_URL must be copied exactly from input user_label and user_url values.",
-          "- If user_url is 'unknown', do not include that user as a participant.",
-          "- MESSAGE_URL must be copied from input message_url values; never invent URLs.",
-          "- VERB must be short and human (for example: says, adds, asks, agrees, disagrees, reports, clarifies, suggests).",
-          "- OBJECT is a short paraphrase of what was said.",
-          "- Mention who said what, but prefer paraphrasing over quoting raw message text.",
-          "- Use only participant labels/urls from the input. Do NOT invent participants.",
-          "- Escape '&', '<', and '>' in topic/object text using HTML entities.",
-          "- Do not include raw URLs outside href attributes.",
-          "- Do not use Markdown syntax anywhere.",
-          "- Do not invent details."
+          "Constraints:",
+          "- 1-4 SVO entries per topic line.",
+          "- Reuse USER_LABEL and USER_URL exactly from input; skip rows where user_url is 'unknown'.",
+          "- Reuse MESSAGE_URL exactly from input; never invent URLs, participants, or facts.",
+          "- VERB short (e.g. says/adds/asks/agrees/disagrees/reports/clarifies/suggests).",
+          "- OBJECT is a short summary of what was said.",
+          "- Escape '&', '<', and '>' in topic/object text.",
+          "- No raw URLs outside href and no Markdown syntax.",
+          `- Keep output around <= ${SUMMARY_MAX_TOKENS} tokens; if tight, use fewer lines/entries and never leave unclosed HTML tags.`
         ].join("\n")
     },
     {
@@ -138,8 +137,14 @@ export async function generateSummary(
 
   let result: unknown;
   try {
+    console.log("Workers AI summary input", {
+      windowText,
+      messages: content
+    });
+
     result = await env.AI.run(SUMMARY_MODEL, {
-      messages: messagesPrompt
+      messages: messagesPrompt,
+      max_tokens: SUMMARY_MAX_TOKENS
     });
   } catch (error) {
     console.error("Workers AI run failed", error);
@@ -151,6 +156,8 @@ export async function generateSummary(
     console.error("Unexpected Workers AI output format", result);
     return { ok: false, reason: "ai_error" };
   }
+
+  console.log("Workers AI raw summary output", rawText);
 
   const trimmed = rawText.trim();
   return trimmed

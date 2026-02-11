@@ -32,7 +32,7 @@ export function buildTelegramMessageUrl(options: {
 export function buildTelegramUserLink(options: {
   username: string | undefined;
   userId: number | undefined;
-}): { label: string; url: string } | undefined {
+}): { label: string; url: string } {
   const username = options.username?.trim();
   if (username) {
     return {
@@ -41,12 +41,15 @@ export function buildTelegramUserLink(options: {
     };
   }
 
-  if (options.userId !== null) {
+  if (typeof options.userId === "number") {
     return {
       label: `user:${options.userId}`,
       url: `tg://user?id=${options.userId}`
     };
   }
 
-  return undefined;
+  return {
+    label: "user:unknown",
+    url: "unknown"
+  };
 }
