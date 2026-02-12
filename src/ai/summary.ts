@@ -16,7 +16,8 @@ type SummaryAiMessage = {
   content: string;
 };
 
-const SUMMARY_MAX_TOKENS = 800;
+const SUMMARY_MAX_TOKENS = 1200;
+const SUMMARY_PROMPT_BUDGET_TOKENS = Math.floor(SUMMARY_MAX_TOKENS / 2);
 
 function extractWorkersAiText(result: unknown): string | undefined {
   if (!result || typeof result !== "object") return undefined;
@@ -126,7 +127,7 @@ export async function generateSummary(
           "- OBJECT is a short summary of what was said.",
           "- Escape '&', '<', and '>' in topic/object text.",
           "- No raw URLs outside href and no Markdown syntax.",
-          `- Keep output around <= ${SUMMARY_MAX_TOKENS} tokens; if tight, use fewer lines/entries and never leave unclosed HTML tags.`
+          `- Keep output strictly less than ${SUMMARY_PROMPT_BUDGET_TOKENS} tokens; if tight, use fewer lines/entries and never leave unclosed HTML tags.`
         ].join("\n")
     },
     {

@@ -4,18 +4,20 @@ export async function sendTelegramMessage(
   token: string,
   chatId: number,
   text: string,
-  replyToMessageId: number
+  replyToMessageId?: number
 ): Promise<boolean> {
   const body: Record<string, unknown> = {
     chat_id: chatId,
     text,
     parse_mode: "HTML",
-    disable_web_page_preview: true,
-    reply_parameters: {
+    disable_web_page_preview: true
+  };
+  if (typeof replyToMessageId === "number") {
+    body.reply_parameters = {
       message_id: replyToMessageId,
       allow_sending_without_reply: true
-    }
-  };
+    };
+  }
 
   const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
     method: "POST",
@@ -33,12 +35,14 @@ export async function sendTelegramMessage(
       const fallbackBody: Record<string, unknown> = {
         chat_id: chatId,
         text: `Summary (unformatted):\n\n${text}`,
-        disable_web_page_preview: true,
-        reply_parameters: {
+        disable_web_page_preview: true
+      };
+      if (typeof replyToMessageId === "number") {
+        fallbackBody.reply_parameters = {
           message_id: replyToMessageId,
           allow_sending_without_reply: true
-        }
-      };
+        };
+      }
 
       const fallbackResponse = await fetch(
         `${TELEGRAM_API_BASE}/bot${token}/sendMessage`,

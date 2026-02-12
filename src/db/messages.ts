@@ -20,6 +20,16 @@ export type MessageInsert = {
   replyToMessageId: number | null;
 };
 
+export type ActiveChat = {
+  chatId: number;
+  chatUsername: string | null;
+};
+
+type ActiveChatRow = {
+  chat_id: number;
+  chat_username: string | null;
+};
+
 export async function insertMessage(env: Env, message: MessageInsert): Promise<void> {
   await env.DB.prepare(
     `INSERT OR IGNORE INTO messages (
@@ -65,3 +75,22 @@ export async function loadMessagesForSummary(
   return (result.results ?? []) as StoredMessage[];
 }
 
+export async function loadActiveChatsForWindow(
+  env: Env,
+  windowStart: number,
+  windowEnd: number
+): Promise<ActiveChat[]> {
+  const result = await env.DB.prepare(
+    `SELECT chat_id, MAX(chat_username) AS chat_username
+     FROM messages
+     WHERE ts BETWEEN ? AND ?
+     GROUP BY chat_id`
+  )
+    .bind(windowStart, windowEnd)
+    .all<ActiveChatRow>();
+
+  return (result.results ?? []).map((row) => ({
+    chatId: row.chat_id,
+    chatUsername: row.chat_username
+  }));
+}
