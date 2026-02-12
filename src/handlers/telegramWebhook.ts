@@ -16,6 +16,7 @@ import {
   loadMessagesForSummary,
   type StoredMessage
 } from "../db/messages";
+import { loadServiceStatusSnapshot } from "../db/serviceStats";
 import { generateSummary } from "../ai/summary";
 
 export async function handleTelegramWebhook(
@@ -133,6 +134,14 @@ async function tryHandleCommand(
           }
         }
       }
+    } else if (commandResult.command.type === "status") {
+      try {
+        const status = await loadServiceStatusSnapshot(env);
+        replyText = buildStatusText(status, message.date);
+      } catch (error) {
+        console.error("Failed to load service status", error);
+        replyText = "Failed to load status.";
+      }
     }
   } else {
     if (commandResult.reason !== "unknown command") {
@@ -162,4 +171,53 @@ async function tryHandleCommand(
   }
 
   return new Response("ok", { status: 200 });
+}
+
+function buildStatusText(
+  status: {
+    uptimeStart: number;
+    lastOkTs: number | null;
+    errorCount: number;
+    lastError: string | null;
+    messageCount: number;
+    summaryCount: number;
+  },
+  nowSeconds: number
+): string {
+  const uptimeSeconds = Math.max(0, nowSeconds - status.uptimeStart);
+
+  const days = Math.floor(uptimeSeconds / 86_400);
+  const hours = Math.floor((uptimeSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((uptimeSeconds % 3_600) / 60);
+
+  const uptimeText = `${days}d ${hours}h ${minutes}m`;
+  const lastOkText = formatTimestamp(status.lastOkTs);
+  const lastErrorText = status.lastError
+    ? escapeHtml(status.lastError)
+    : "none";
+
+  return [
+    "<b>Status</b>",
+    `Uptime: ${uptimeText}`,
+    `Errors: ${status.errorCount}`,
+    `Last OK: ${lastOkText}`,
+    `Last error: ${lastErrorText}`,
+    `Stored messages: ${status.messageCount}`,
+    `Stored summaries: ${status.summaryCount}`
+  ].join("\n");
+}
+
+function formatTimestamp(timestamp: number | null): string {
+  if (timestamp === null) {
+    return "n/a";
+  }
+
+  return new Date(timestamp * 1_000).toISOString();
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

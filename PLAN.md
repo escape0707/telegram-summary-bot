@@ -91,8 +91,8 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 - [x] feat: summary command (stub response)
 - [x] feat: workers-ai summarization (shared pipeline) (without format instruction prompt engineering)
 - [x] feat: prompt engineer HTML SVO formatting (topic clusters + user/message links)
+- [x] feat: status/usage command
 - [ ] feat: cron trigger + daily summary dispatch
-- [ ] feat: status/usage command
 - [ ] feat: error tracking + alerting
 
 ## Implementation Notes
