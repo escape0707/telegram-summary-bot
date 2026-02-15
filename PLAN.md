@@ -99,7 +99,7 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 ### Wrap-up Checklist
 
 - [x] ci: add GitHub Actions quality workflow (pnpm install + tsc typecheck)
-- [ ] cd: add GitHub Actions deploy workflow (manual dispatch first)
+- [x] cd: add GitHub Actions deploy workflow (manual dispatch first)
 - [ ] chore: automate Telegram webhook + bot command registration
 - [ ] docs: add project docs + ops runbook
 - [ ] test: add unit test setup and first suites
