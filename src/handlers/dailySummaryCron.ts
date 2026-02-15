@@ -4,6 +4,7 @@ import {
   loadMessagesForSummary
 } from "../db/messages";
 import type { Env } from "../env";
+import { AppError, ErrorCode } from "../ops/errors";
 import { runTrackedTask } from "../ops/serviceTracking";
 import type { SummaryCommand } from "../telegram/commands";
 import { sendTelegramMessage } from "../telegram/api";
@@ -25,7 +26,10 @@ export async function handleDailySummaryCron(
     const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
     if (!botToken) {
       console.error("TELEGRAM_BOT_TOKEN is not configured");
-      throw new Error("TELEGRAM_BOT_TOKEN is not configured");
+      throw new AppError(
+        ErrorCode.ConfigMissing,
+        "TELEGRAM_BOT_TOKEN is not configured"
+      );
     }
 
     const windowEnd = Math.floor(controller.scheduledTime / 1_000);
@@ -36,7 +40,7 @@ export async function handleDailySummaryCron(
       chats = await loadActiveChatsForWindow(env, windowStart, windowEnd);
     } catch (error) {
       console.error("Failed to load active chats for daily summary", error);
-      throw new Error("could not load active chats");
+      throw new AppError(ErrorCode.DbQueryFailed, "could not load active chats");
     }
 
     console.log("Daily summary cron started", {
@@ -121,7 +125,8 @@ export async function handleDailySummaryCron(
     });
 
     if (failedCount > 0) {
-      throw new Error(
+      throw new AppError(
+        ErrorCode.CronDispatchPartialFailure,
         `completed with ${failedCount} failures (${firstFailureReason ?? "unknown"})`
       );
     }

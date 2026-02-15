@@ -1,16 +1,25 @@
 import { markServiceOk, recordServiceError } from "../db/serviceStats";
 import type { Env } from "../env";
+import { AppError, ErrorCode, type ErrorCode as AppErrorCode } from "./errors";
 
 const INTERNAL_ERROR_STATUS = 500;
 
-function getErrorMessage(error: unknown): string {
+type TrackedError = {
+  code: AppErrorCode;
+  detail: string;
+};
+
+function getTrackedError(error: unknown): TrackedError {
+  if (error instanceof AppError) {
+    return { code: error.code, detail: error.message };
+  }
   if (error instanceof Error) {
-    return error.message;
+    return { code: ErrorCode.UnhandledException, detail: error.message };
   }
   if (typeof error === "string") {
-    return error;
+    return { code: ErrorCode.UnhandledException, detail: error };
   }
-  return String(error);
+  return { code: ErrorCode.UnhandledException, detail: String(error) };
 }
 
 async function safeMarkServiceOk(env: Env): Promise<void> {
@@ -24,13 +33,15 @@ async function safeMarkServiceOk(env: Env): Promise<void> {
 async function safeRecordServiceError(
   env: Env,
   operation: string,
+  code: AppErrorCode,
   detail: string
 ): Promise<void> {
   try {
-    await recordServiceError(env, `${operation}: ${detail}`);
+    await recordServiceError(env, `${operation} [${code}] ${detail}`);
   } catch (error) {
     console.error("Failed to update service_stats error state", {
       operation,
+      code,
       detail,
       error
     });
@@ -45,18 +56,20 @@ export async function runTrackedResponse(
   try {
     const response = await run();
     if (response.status >= INTERNAL_ERROR_STATUS) {
-      await safeRecordServiceError(env, operation, `response_${response.status}`);
+      await safeRecordServiceError(
+        env,
+        operation,
+        ErrorCode.ResponseStatus,
+        `status=${response.status}`
+      );
     } else {
       await safeMarkServiceOk(env);
     }
     return response;
   } catch (error) {
-    console.error(`${operation} failed with unhandled exception`, error);
-    await safeRecordServiceError(
-      env,
-      operation,
-      `exception: ${getErrorMessage(error)}`
-    );
+    const trackedError = getTrackedError(error);
+    console.error(`${operation} failed`, { trackedError, error });
+    await safeRecordServiceError(env, operation, trackedError.code, trackedError.detail);
     return new Response("internal error", { status: 500 });
   }
 }
@@ -70,11 +83,8 @@ export async function runTrackedTask(
     await run();
     await safeMarkServiceOk(env);
   } catch (error) {
-    console.error(`${operation} failed with unhandled exception`, error);
-    await safeRecordServiceError(
-      env,
-      operation,
-      `exception: ${getErrorMessage(error)}`
-    );
+    const trackedError = getTrackedError(error);
+    console.error(`${operation} failed`, { trackedError, error });
+    await safeRecordServiceError(env, operation, trackedError.code, trackedError.detail);
   }
 }

@@ -94,6 +94,7 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 - [x] feat: status/usage command
 - [x] feat: cron trigger + daily summary dispatch
 - [x] feat: error tracking (alerting deferred)
+- [x] chore: typed error codes for tracked operations
 
 ## Implementation Notes
 
