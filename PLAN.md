@@ -96,6 +96,14 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 - [x] feat: error tracking (alerting deferred)
 - [x] chore: typed error codes for tracked operations
 
+### Wrap-up Checklist
+
+- [x] ci: add GitHub Actions quality workflow (pnpm install + tsc typecheck)
+- [ ] cd: add GitHub Actions deploy workflow (manual dispatch first)
+- [ ] chore: automate Telegram webhook + bot command registration
+- [ ] docs: add project docs + ops runbook
+- [ ] test: add unit test setup and first suites
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `WORKERS_AI_*`, `D1_DATABASE_*`.
