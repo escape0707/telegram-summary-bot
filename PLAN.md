@@ -2,16 +2,19 @@
 
 ## Problem / Motivation
 
-Build a Telegram group-summary bot: ingest group messages, generate LLM summaries, post
-daily summaries at 17:00 JST (08:00 UTC), and expose status/usage commands. It must run
-on Cloudflare free tiers with minimal ongoing cost and operational burden.
+Build a Telegram group-summary bot: ingest group messages, generate LLM
+summaries, post daily summaries at 17:00 JST (08:00 UTC), and expose
+status/usage commands. It must run on Cloudflare free tiers with minimal
+ongoing cost and operational burden.
 
 ## Goals
 
-- Ingest and store non-command Telegram group messages (timestamp, author, text, and identifiers to build message/user links).
+- Ingest and store non-command Telegram group messages (timestamp, author,
+  text, and identifiers to build message/user links).
 - Provide on-demand summaries for last 1h, last 24h, and custom time windows.
 - Post daily summary at 17:00 JST (08:00 UTC) to each group the bot is in.
-- Summaries cluster messages by topic, then output SVO entries per topic (Subject=user link; Verb=message link; Object=short summary).
+- Summaries cluster messages by topic, then output SVO entries per topic
+  (Subject=user link; Verb=message link; Object=short summary).
 - Expose service status/usage stats (uptime, error counts, DB usage where possible).
 - Run on Cloudflare Workers + D1 + Workers AI free tiers.
 
@@ -36,7 +39,9 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
   - Command: fetch messages in requested window, summarize via Workers AI, reply.
 - Cloudflare Cron Trigger runs daily at 08:00 UTC:
   - For each group with recent activity, summarize last 24h and post to group.
-- Workers AI: use `@cf/mistralai/mistral-small-3.1-24b-instruct` with chat-style `messages` to do topic clustering and reply formatting by prompt engineering.
+- Workers AI: use `@cf/mistralai/mistral-small-3.1-24b-instruct` with
+  chat-style `messages` to do topic clustering and reply formatting by prompt
+  engineering.
 - D1 stores:
   - messages: chat_id, chat_username, message_id, user_id, username, text, ts, reply_to.
   - summaries: chat_id, window_start, window_end, summary_text, ts.
@@ -46,15 +51,19 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 
 - Telegram webhook: POST /telegram (set via setWebhook).
 - Commands:
-  - /summary [Nh [Mh]] (N defaults to 1, 0 treated as 1; M defaults to 0; N,M in 0..168; require N > M; optional 'h')
+  - /summary [Nh [Mh]] (N defaults to 1, 0 treated as 1; M defaults to 0;
+    N,M in 0..168; require N > M; optional 'h')
   - /summaryday (alias of /summary 24h)
   - /status
 - Summary format (for one topic cluster):
-  - Topic, then SVO (Subject-Verb-Object) entries: Subject is a clickable user link; Verb is clickable message link text (e.g. says/adds/agrees/disagrees); Object is a short summary.
+  - Topic, then SVO (Subject-Verb-Object) entries: Subject is a clickable user
+    link; Verb is clickable message link text (e.g.
+    says/adds/agrees/disagrees); Object is a short summary.
   - Example (Telegram HTML, TSX-style placeholders):
 
     ```tsx
-    <b>{topic}</b>: {userLink1} {messageLink1} {obj1}; {userLink2} {messageLink2} {obj2}; {userLink3} {messageLink3} {obj3}.
+    <b>{topic}</b>: {userLink1} {messageLink1} {obj1}; {userLink2}
+    {messageLink2} {obj2}; {userLink3} {messageLink3} {obj3}.
     ```
 
   - User link format for users:
@@ -89,7 +98,8 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 - [x] feat: message ingest + D1 insert
 - [x] feat: command parsing + window parsing
 - [x] feat: summary command (stub response)
-- [x] feat: workers-ai summarization (shared pipeline) (without format instruction prompt engineering)
+- [x] feat: workers-ai summarization (shared pipeline) (without format
+  instruction prompt engineering)
 - [x] feat: prompt engineer HTML SVO formatting (topic clusters + user/message links)
 - [x] feat: status/usage command
 - [x] feat: cron trigger + daily summary dispatch
@@ -101,18 +111,23 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 - [x] ci: add GitHub Actions quality workflow (pnpm install + tsc typecheck)
 - [x] cd: add GitHub Actions deploy workflow (manual dispatch first)
 - [x] chore: automate Telegram webhook + bot command registration
-- [ ] docs: add project docs + ops runbook
+- [x] docs: add project docs + ops runbook
 - [ ] test: add unit test setup and first suites
 
 ## Implementation Notes
 
-- Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `WORKERS_AI_*`, `D1_DATABASE_*`.
-- Summary windows are hour-based: `/summary [Nh [Mh]]` uses the range from N hours before to M hours before, defaulting to 1h→0h.
+- Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
+  `WORKERS_AI_*`, `D1_DATABASE_*`.
+- Summary windows are hour-based: `/summary [Nh [Mh]]` uses the range from N
+  hours before to M hours before, defaulting to 1h→0h.
 - Bot command messages are handled for commands but excluded from message storage.
-- Service-level error tracking is persisted in `service_stats`; Telegram alerting is deferred until an ops channel is set up.
+- Service-level error tracking is persisted in `service_stats`; Telegram
+  alerting is deferred until an ops channel is set up.
 - Telegram replies use `parse_mode: HTML` (avoid Markdown escaping / LLM confusion).
-- When setting the Telegram webhook, set `allowed_updates` to only the update types we handle (currently `message`, `edited_message`) to reduce noise.
-- Register bot commands (BotFather or `setMyCommands`) for `/summary`, `/summaryday`, `/status` so they show in the UI.
+- When setting the Telegram webhook, set `allowed_updates` to only the update
+  types we handle (currently `message`, `edited_message`) to reduce noise.
+- Register bot commands (BotFather or `setMyCommands`) for `/summary`,
+  `/summaryday`, `/status` so they show in the UI.
 
 ## Test / Validation Plan
 
