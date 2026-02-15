@@ -17,54 +17,57 @@ import {
   type StoredMessage
 } from "../db/messages";
 import { loadServiceStatusSnapshot } from "../db/serviceStats";
+import { runTrackedResponse } from "../ops/serviceTracking";
 import { generateSummary } from "../ai/summary";
 
 export async function handleTelegramWebhook(
   request: Request,
   env: Env
 ): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response("method not allowed", { status: 405 });
-  }
-
-  const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET?.trim();
-  if (!expectedSecret) {
-    return new Response("webhook secret not configured", { status: 500 });
-  }
-
-  const providedSecret = request.headers.get(TELEGRAM_SECRET_HEADER);
-  if (providedSecret !== expectedSecret) {
-    return new Response("unauthorized", { status: 401 });
-  }
-
-  let update: TelegramUpdate;
-  try {
-    update = await request.json<TelegramUpdate>();
-  } catch {
-    return new Response("bad request", { status: 400 });
-  }
-
-  if (!update || typeof update.update_id !== "number") {
-    return new Response("bad request", { status: 400 });
-  }
-
-  const message = update.message ?? update.edited_message;
-
-  if (message && hasBotCommandAtStart(message)) {
-    const response = await tryHandleCommand(env, message);
-    if (response) {
-      return response;
+  return runTrackedResponse(env, "webhook", async () => {
+    if (request.method !== "POST") {
+      return new Response("method not allowed", { status: 405 });
     }
-  } else if (message && GROUP_CHAT_TYPES.includes(message.chat.type)) {
+
+    const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET?.trim();
+    if (!expectedSecret) {
+      return new Response("webhook secret not configured", { status: 500 });
+    }
+
+    const providedSecret = request.headers.get(TELEGRAM_SECRET_HEADER);
+    if (providedSecret !== expectedSecret) {
+      return new Response("unauthorized", { status: 401 });
+    }
+
+    let update: TelegramUpdate;
     try {
-      await ingestMessage(env, message);
-    } catch (error) {
-      console.error("Failed to insert message", error);
-      return new Response("internal error", { status: 500 });
+      update = await request.json<TelegramUpdate>();
+    } catch {
+      return new Response("bad request", { status: 400 });
     }
-  }
 
-  return new Response("ok", { status: 200 });
+    if (!update || typeof update.update_id !== "number") {
+      return new Response("bad request", { status: 400 });
+    }
+
+    const message = update.message ?? update.edited_message;
+
+    if (message && hasBotCommandAtStart(message)) {
+      const response = await tryHandleCommand(env, message);
+      if (response) {
+        return response;
+      }
+    } else if (message && GROUP_CHAT_TYPES.includes(message.chat.type)) {
+      try {
+        await ingestMessage(env, message);
+      } catch (error) {
+        console.error("Failed to insert message", error);
+        return new Response("internal error", { status: 500 });
+      }
+    }
+
+    return new Response("ok", { status: 200 });
+  });
 }
 
 async function ingestMessage(env: Env, message: TelegramMessage): Promise<void> {

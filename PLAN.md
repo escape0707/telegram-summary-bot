@@ -93,13 +93,14 @@ on Cloudflare free tiers with minimal ongoing cost and operational burden.
 - [x] feat: prompt engineer HTML SVO formatting (topic clusters + user/message links)
 - [x] feat: status/usage command
 - [x] feat: cron trigger + daily summary dispatch
-- [ ] feat: error tracking + alerting
+- [x] feat: error tracking (alerting deferred)
 
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `WORKERS_AI_*`, `D1_DATABASE_*`.
 - Summary windows are hour-based: `/summary [Nh [Mh]]` uses the range from N hours before to M hours before, defaulting to 1h→0h.
 - Bot command messages are handled for commands but excluded from message storage.
+- Service-level error tracking is persisted in `service_stats`; Telegram alerting is deferred until an ops channel is set up.
 - Telegram replies use `parse_mode: HTML` (avoid Markdown escaping / LLM confusion).
 - When setting the Telegram webhook, set `allowed_updates` to only the update types we handle (currently `message`, `edited_message`) to reduce noise.
 - Register bot commands (BotFather or `setMyCommands`) for `/summary`, `/summaryday`, `/status` so they show in the UI.

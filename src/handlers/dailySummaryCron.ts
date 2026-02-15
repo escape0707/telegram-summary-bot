@@ -4,6 +4,7 @@ import {
   loadMessagesForSummary
 } from "../db/messages";
 import type { Env } from "../env";
+import { runTrackedTask } from "../ops/serviceTracking";
 import type { SummaryCommand } from "../telegram/commands";
 import { sendTelegramMessage } from "../telegram/api";
 
@@ -20,98 +21,110 @@ export async function handleDailySummaryCron(
   controller: ScheduledController,
   env: Env
 ): Promise<void> {
-  const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
-  if (!botToken) {
-    console.error("TELEGRAM_BOT_TOKEN is not configured");
-    return;
-  }
+  return runTrackedTask(env, "cron.daily_summary", async () => {
+    const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
+    if (!botToken) {
+      console.error("TELEGRAM_BOT_TOKEN is not configured");
+      throw new Error("TELEGRAM_BOT_TOKEN is not configured");
+    }
 
-  const windowEnd = Math.floor(controller.scheduledTime / 1_000);
-  const windowStart = windowEnd - DAY_SECONDS;
+    const windowEnd = Math.floor(controller.scheduledTime / 1_000);
+    const windowStart = windowEnd - DAY_SECONDS;
 
-  let chats;
-  try {
-    chats = await loadActiveChatsForWindow(env, windowStart, windowEnd);
-  } catch (error) {
-    console.error("Failed to load active chats for daily summary", error);
-    return;
-  }
-
-  console.log("Daily summary cron started", {
-    cron: controller.cron,
-    scheduledTime: new Date(controller.scheduledTime).toISOString(),
-    activeChats: chats.length
-  });
-
-  let sentCount = 0;
-  let skippedNoMessages = 0;
-  let skippedNoText = 0;
-  let failedCount = 0;
-
-  for (const chat of chats) {
+    let chats;
     try {
-      const rows = await loadMessagesForSummary(
-        env,
-        chat.chatId,
-        windowStart,
-        windowEnd
-      );
-      if (rows.length === 0) {
-        skippedNoMessages += 1;
-        continue;
-      }
+      chats = await loadActiveChatsForWindow(env, windowStart, windowEnd);
+    } catch (error) {
+      console.error("Failed to load active chats for daily summary", error);
+      throw new Error("could not load active chats");
+    }
 
-      const summaryResult = await generateSummary(
-        env,
-        rows.slice().reverse(),
-        DAILY_SUMMARY_COMMAND,
-        chat.chatId,
-        chat.chatUsername ?? undefined
-      );
+    console.log("Daily summary cron started", {
+      cron: controller.cron,
+      scheduledTime: new Date(controller.scheduledTime).toISOString(),
+      activeChats: chats.length
+    });
 
-      if (!summaryResult.ok) {
-        if (summaryResult.reason === "no_text") {
-          skippedNoText += 1;
+    let sentCount = 0;
+    let skippedNoMessages = 0;
+    let skippedNoText = 0;
+    let failedCount = 0;
+    let firstFailureReason: string | undefined;
+
+    for (const chat of chats) {
+      try {
+        const rows = await loadMessagesForSummary(
+          env,
+          chat.chatId,
+          windowStart,
+          windowEnd
+        );
+        if (rows.length === 0) {
+          skippedNoMessages += 1;
+          continue;
+        }
+
+        const summaryResult = await generateSummary(
+          env,
+          rows.slice().reverse(),
+          DAILY_SUMMARY_COMMAND,
+          chat.chatId,
+          chat.chatUsername ?? undefined
+        );
+
+        if (!summaryResult.ok) {
+          if (summaryResult.reason === "no_text") {
+            skippedNoText += 1;
+          } else {
+            failedCount += 1;
+            firstFailureReason ??= `summary generation failed for chat ${chat.chatId}`;
+            console.error("Failed to generate daily summary", {
+              chatId: chat.chatId,
+              reason: summaryResult.reason
+            });
+          }
+          continue;
+        }
+
+        const sent = await sendTelegramMessage(
+          botToken,
+          chat.chatId,
+          buildDailySummaryMessage(summaryResult.summary)
+        );
+        if (sent) {
+          sentCount += 1;
         } else {
           failedCount += 1;
-          console.error("Failed to generate daily summary", {
-            chatId: chat.chatId,
-            reason: summaryResult.reason
+          firstFailureReason ??= `telegram send failed for chat ${chat.chatId}`;
+          console.error("Failed to send daily summary", {
+            chatId: chat.chatId
           });
         }
-        continue;
-      }
-
-      const sent = await sendTelegramMessage(
-        botToken,
-        chat.chatId,
-        buildDailySummaryMessage(summaryResult.summary)
-      );
-      if (sent) {
-        sentCount += 1;
-      } else {
+      } catch (error) {
         failedCount += 1;
-        console.error("Failed to send daily summary", {
-          chatId: chat.chatId
+        firstFailureReason ??= `dispatch exception for chat ${chat.chatId}`;
+        console.error("Daily summary dispatch failed", {
+          chatId: chat.chatId,
+          error
         });
       }
-    } catch (error) {
-      failedCount += 1;
-      console.error("Daily summary dispatch failed", {
-        chatId: chat.chatId,
-        error
-      });
     }
-  }
 
-  console.log("Daily summary cron finished", {
-    windowStart,
-    windowEnd,
-    activeChats: chats.length,
-    sentCount,
-    skippedNoMessages,
-    skippedNoText,
-    failedCount
+    console.log("Daily summary cron finished", {
+      windowStart,
+      windowEnd,
+      activeChats: chats.length,
+      sentCount,
+      skippedNoMessages,
+      skippedNoText,
+      failedCount
+    });
+
+    if (failedCount > 0) {
+      throw new Error(
+        `completed with ${failedCount} failures (${firstFailureReason ?? "unknown"})`
+      );
+    }
   });
 }
 
