@@ -6,10 +6,13 @@
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev --test-scheduled",
 		"start": "wrangler dev --test-scheduled",
+		"telegram:setup": "tsx scripts/setup-telegram.ts",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20260214.0",
+		"@types/node": "^25.2.3",
+		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"wrangler": "^4.65.0"
 	},
