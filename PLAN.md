@@ -114,6 +114,12 @@ ongoing cost and operational burden.
 - [x] docs: add project docs + ops runbook
 - [ ] test: add unit test setup and first suites
 
+### Rate Limiting Checklist
+
+- [x] docs: add rate limiting plan and commit boundaries
+- [x] feat: add D1-backed rate limiting for `/summary` and `/summaryday`
+- [x] docs: document rate limiting behavior and tuning
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,

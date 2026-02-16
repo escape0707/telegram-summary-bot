@@ -10,6 +10,7 @@ on-demand and daily AI summaries.
 - `/summaryday` alias for last 24h.
 - `/status` for service snapshot and counters.
 - Daily cron summary dispatch (08:00 UTC / 17:00 JST).
+- Summary command rate limiting (per-user-in-chat and per-chat fixed windows).
 - GitHub Actions CI (typecheck) and manual CD workflow.
 
 ## Stack
@@ -76,6 +77,15 @@ Optional:
 - `pnpm deploy`: deploy worker.
 - `pnpm cf-typegen`: regenerate Cloudflare types.
 - `pnpm run telegram:setup`: call Telegram `setWebhook` + `setMyCommands`.
+
+## Rate Limiting
+
+- Applies to `/summary` and `/summaryday` only.
+- Uses fixed 10-minute windows.
+- Default limits:
+  - Per-user-in-chat: 3 requests per 10 minutes.
+  - Per-chat: 20 requests per 10 minutes.
+- Tuning values live in `src/config.ts`.
 
 ## Docs
 

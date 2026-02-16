@@ -64,6 +64,19 @@ This runbook covers setup, deploy, verification, and basic recovery for
 For short-interval testing, temporarily change cron schedule, deploy, verify,
 then revert.
 
+## Rate Limiting
+
+- Scope:
+  - `/summary`
+  - `/summaryday`
+- Excluded:
+  - `/status`
+- Default limits:
+  - Per-user-in-chat: 3 requests / 10 minutes.
+  - Per-chat: 20 requests / 10 minutes.
+- Storage: D1 `rate_limits` table, fixed-window counters.
+- Tuning: update values in `src/config.ts`, deploy, then monitor logs.
+
 ## Common Issues
 
 1. `401 unauthorized` on webhook:
@@ -77,6 +90,9 @@ then revert.
    Group message type is unsupported.
 4. `activeChats: 0` in cron logs:
    No non-command messages in the last 24 hours.
+5. `Rate limit exceeded` responses for summary commands:
+   Expected behavior under load.
+   Consider tuning rate limits in `src/config.ts` if limits are too strict.
 
 ## Recovery
 

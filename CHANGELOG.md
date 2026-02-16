@@ -16,3 +16,6 @@
 - Telegram setup script for webhook and bot command registration.
 - Project docs and ops runbook.
 - AGPL-3.0 `LICENSE` and root `COPYRIGHT` notice.
+- D1-backed rate limiting for `/summary` and `/summaryday`:
+  - Per-user-in-chat: 3 requests / 10 minutes.
+  - Per-chat: 20 requests / 10 minutes.

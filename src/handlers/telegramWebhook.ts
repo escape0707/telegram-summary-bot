@@ -148,6 +148,7 @@ async function buildSummaryCommandReplyText(
       return buildSummaryRateLimitText(rateLimit);
     }
   } catch (error) {
+    // Fail-open to avoid blocking usage when rate-limit storage is unhealthy.
     console.error("Failed to check summary rate limit", error);
   }
 
