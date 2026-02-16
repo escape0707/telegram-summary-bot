@@ -1,4 +1,7 @@
 import {
+  RATE_LIMIT_CLEANUP_BATCH_SIZE,
+  RATE_LIMIT_CLEANUP_MAX_BATCHES,
+  RATE_LIMIT_CLEANUP_RETENTION_SECONDS,
   SUMMARY_RATE_LIMIT_CHAT_LIMIT,
   SUMMARY_RATE_LIMIT_USER_LIMIT,
   SUMMARY_RATE_LIMIT_WINDOW_SECONDS
@@ -21,6 +24,10 @@ export type SummaryRateLimitResult =
       windowSeconds: number;
       retryAfterSeconds: number;
     };
+
+type RunMetaWithChanges = {
+  changes?: number;
+};
 
 function windowStartFor(timestampSeconds: number, windowSeconds: number): number {
   return Math.floor(timestampSeconds / windowSeconds) * windowSeconds;
@@ -121,4 +128,50 @@ export async function enforceSummaryRateLimit(
   }
 
   return { allowed: true };
+}
+
+async function deleteStaleRateLimitsBatch(
+  env: Env,
+  cutoffSeconds: number,
+  batchSize: number
+): Promise<number> {
+  const result = await env.DB.prepare(
+    `DELETE FROM rate_limits
+     WHERE rowid IN (
+       SELECT rowid
+       FROM rate_limits
+       WHERE updated_at < ?
+       ORDER BY updated_at
+       LIMIT ?
+     )`
+  )
+    .bind(cutoffSeconds, batchSize)
+    .run();
+
+  const meta = result.meta as RunMetaWithChanges | undefined;
+  const changes = meta?.changes ?? 0;
+  return Number.isFinite(changes) ? changes : 0;
+}
+
+export async function cleanupStaleRateLimits(
+  env: Env,
+  nowSeconds: number,
+  retentionSeconds: number = RATE_LIMIT_CLEANUP_RETENTION_SECONDS
+): Promise<number> {
+  const cutoffSeconds = nowSeconds - retentionSeconds;
+  let deleted = 0;
+
+  for (let batch = 0; batch < RATE_LIMIT_CLEANUP_MAX_BATCHES; batch += 1) {
+    const removed = await deleteStaleRateLimitsBatch(
+      env,
+      cutoffSeconds,
+      RATE_LIMIT_CLEANUP_BATCH_SIZE
+    );
+    if (removed === 0) {
+      break;
+    }
+    deleted += removed;
+  }
+
+  return deleted;
 }
