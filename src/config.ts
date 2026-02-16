@@ -8,3 +8,7 @@ export const MAX_SUMMARY_HOURS = 24 * 7;
 export const MAX_MESSAGES_FOR_SUMMARY = 200;
 export const MAX_MESSAGE_LENGTH = 280;
 export const MAX_PROMPT_CHARS = 8000;
+
+export const SUMMARY_RATE_LIMIT_WINDOW_SECONDS = 10 * 60;
+export const SUMMARY_RATE_LIMIT_USER_LIMIT = 3;
+export const SUMMARY_RATE_LIMIT_CHAT_LIMIT = 20;
