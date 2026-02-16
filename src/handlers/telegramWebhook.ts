@@ -1,8 +1,9 @@
 import { sendTelegramMessage } from "../telegram/api.js";
 import {
-  buildSummaryErrorText,
+  buildCommandParseErrorText,
   hasBotCommandAtStart,
-  parseTelegramCommand
+  parseTelegramCommand,
+  type SummaryCommand
 } from "../telegram/commands.js";
 import {
   GROUP_CHAT_TYPES,
@@ -94,75 +95,85 @@ async function tryHandleCommand(
   message: TelegramMessage & { text: string }
 ): Promise<Response | undefined> {
   const commandResult = parseTelegramCommand(message.text);
-  let replyText: string | undefined;
-
-  if (commandResult.ok) {
-    if (commandResult.command.type === "summary") {
-      const windowStart =
-        message.date - commandResult.command.fromHours * 60 * 60;
-      const windowEnd =
-        message.date - commandResult.command.toHours * 60 * 60;
-
-      let rows: StoredMessage[];
-      try {
-        rows = await loadMessagesForSummary(
-          env,
-          message.chat.id,
-          windowStart,
-          windowEnd
-        );
-      } catch (error) {
-        console.error("Failed to load messages for summary", error);
-        replyText = "Failed to load messages for summary.";
-        rows = [];
-      }
-
-      if (!replyText) {
-        if (rows.length === 0) {
-          replyText = "No messages found in that window.";
-        } else {
-          const summaryResult = await generateSummary(
-            env,
-            rows.slice().reverse(),
-            commandResult.command,
-            message.chat.id,
-            message.chat.username
-          );
-          if (summaryResult.ok) {
-            replyText = summaryResult.summary;
-          } else if (summaryResult.reason === "no_text") {
-            replyText = "No text messages found in that window.";
-          } else {
-            replyText = "Failed to generate summary (check logs).";
-          }
-        }
-      }
-    } else if (commandResult.command.type === "status") {
-      try {
-        const status = await loadServiceStatusSnapshot(env);
-        replyText = buildStatusText(status, message.date);
-      } catch (error) {
-        console.error("Failed to load service status", error);
-        replyText = "Failed to load status.";
-      }
-    }
-  } else {
-    if (commandResult.reason !== "unknown command") {
-      replyText = buildSummaryErrorText(commandResult.reason);
+  if (!commandResult.ok) {
+    if (commandResult.reason === "unknown command") {
+      // Returns silently for mistyped commands or other bots' commands.
+      return undefined;
     }
     console.warn("Invalid command format", commandResult.reason);
+    const replyText = buildCommandParseErrorText(commandResult.reason);
+    return sendCommandReply(env, message, replyText);
   }
 
-  if (!replyText) {
-    return undefined;
+  const command = commandResult.command;
+  switch (command.type) {
+    case "summary": {
+      const replyText = await buildSummaryCommandReplyText(env, message, command);
+      return sendCommandReply(env, message, replyText);
+    }
+    case "status": {
+      try {
+        const status = await loadServiceStatusSnapshot(env);
+        const replyText = buildStatusText(status, message.date);
+        return sendCommandReply(env, message, replyText);
+      } catch (error) {
+        console.error("Failed to load service status", error);
+        return sendCommandReply(env, message, "Failed to load status.");
+      }
+    }
+    default: {
+      const exhaustiveCheck: never = command;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+async function buildSummaryCommandReplyText(
+  env: Env,
+  message: TelegramMessage & { text: string },
+  command: SummaryCommand
+): Promise<string> {
+  const windowStart = message.date - command.fromHours * 60 * 60;
+  const windowEnd = message.date - command.toHours * 60 * 60;
+
+  let rows: StoredMessage[];
+  try {
+    rows = await loadMessagesForSummary(env, message.chat.id, windowStart, windowEnd);
+  } catch (error) {
+    console.error("Failed to load messages for summary", error);
+    return "Failed to load messages for summary.";
   }
 
+  if (rows.length === 0) {
+    return "No messages found in that window.";
+  }
+
+  const summaryResult = await generateSummary(
+    env,
+    rows.slice().reverse(),
+    command,
+    message.chat.id,
+    message.chat.username
+  );
+  if (summaryResult.ok) {
+    return summaryResult.summary;
+  }
+  if (summaryResult.reason === "no_text") {
+    return "No text messages found in that window.";
+  }
+  return "Failed to generate summary (check logs).";
+}
+
+async function sendCommandReply(
+  env: Env,
+  message: TelegramMessage & { text: string },
+  replyText: string
+): Promise<Response> {
   const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) {
     console.error("TELEGRAM_BOT_TOKEN is not configured");
     return new Response("internal error", { status: 500 });
   }
-
   const sent = await sendTelegramMessage(
     botToken,
     message.chat.id,
@@ -172,7 +183,6 @@ async function tryHandleCommand(
   if (!sent) {
     return new Response("internal error", { status: 502 });
   }
-
   return new Response("ok", { status: 200 });
 }
 

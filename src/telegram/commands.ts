@@ -18,7 +18,7 @@ export type CommandParseErrorReason = Extract<
   { ok: false }
 >["reason"];
 
-export function buildSummaryErrorText(reason: CommandParseErrorReason): string {
+export function buildCommandParseErrorText(reason: CommandParseErrorReason): string {
   if (reason === "exceeds max hours") {
     return `Max summary window is ${MAX_SUMMARY_HOURS}h.`;
   }
