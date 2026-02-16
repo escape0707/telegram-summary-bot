@@ -17,6 +17,10 @@ import {
   loadMessagesForSummary,
   type StoredMessage
 } from "../db/messages.js";
+import {
+  enforceSummaryRateLimit,
+  type SummaryRateLimitResult
+} from "../db/rateLimits.js";
 import { loadServiceStatusSnapshot } from "../db/serviceStats.js";
 import { runTrackedResponse } from "../ops/serviceTracking.js";
 import { generateSummary } from "../ai/summary.js";
@@ -133,6 +137,20 @@ async function buildSummaryCommandReplyText(
   message: TelegramMessage & { text: string },
   command: SummaryCommand
 ): Promise<string> {
+  try {
+    const rateLimit = await enforceSummaryRateLimit(
+      env,
+      message.chat.id,
+      message.from?.id ?? null,
+      message.date
+    );
+    if (!rateLimit.allowed) {
+      return buildSummaryRateLimitText(rateLimit);
+    }
+  } catch (error) {
+    console.error("Failed to check summary rate limit", error);
+  }
+
   const windowStart = message.date - command.fromHours * 60 * 60;
   const windowEnd = message.date - command.toHours * 60 * 60;
 
@@ -162,6 +180,32 @@ async function buildSummaryCommandReplyText(
     return "No text messages found in that window.";
   }
   return "Failed to generate summary (check logs).";
+}
+
+function buildSummaryRateLimitText(
+  rateLimit: Exclude<SummaryRateLimitResult, { allowed: true }>
+): string {
+  const target = rateLimit.scope === "user" ? "you" : "this chat";
+  const windowMinutes = Math.floor(rateLimit.windowSeconds / 60);
+
+  return [
+    `Rate limit exceeded for ${target}.`,
+    `Limit: ${rateLimit.limit} summaries per ${windowMinutes} minutes.`,
+    `Try again in ${formatRetryAfter(rateLimit.retryAfterSeconds)}.`
+  ].join(" ");
+}
+
+function formatRetryAfter(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (remainingSeconds === 0) {
+    return `${minutes}m`;
+  }
+  return `${minutes}m ${remainingSeconds}s`;
 }
 
 async function sendCommandReply(
