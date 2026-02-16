@@ -1,5 +1,5 @@
-import { MAX_MESSAGES_FOR_SUMMARY } from "../config";
-import type { Env } from "../env";
+import { MAX_MESSAGES_FOR_SUMMARY } from "../config.js";
+import type { Env } from "../env.js";
 
 export type StoredMessage = {
   message_id: number;

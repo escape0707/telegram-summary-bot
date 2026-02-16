@@ -20,6 +20,11 @@ type TelegramApiResponse<T> = {
   description?: string;
 };
 
+type SetupTelegramEnv = NodeJS.ProcessEnv & {
+  TELEGRAM_ALLOWED_UPDATES?: string;
+  TELEGRAM_DROP_PENDING_UPDATES?: string;
+};
+
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -72,12 +77,14 @@ async function callTelegram<T>(
 }
 
 async function main(): Promise<void> {
+  const setupEnv: SetupTelegramEnv = process.env;
+
   const token = requireEnv("TELEGRAM_BOT_TOKEN");
   const webhookUrl = requireEnv("TELEGRAM_WEBHOOK_URL");
   const webhookSecret = requireEnv("TELEGRAM_WEBHOOK_SECRET");
-  const allowedUpdates = parseAllowedUpdates(process.env.TELEGRAM_ALLOWED_UPDATES);
+  const allowedUpdates = parseAllowedUpdates(setupEnv.TELEGRAM_ALLOWED_UPDATES);
   const dropPendingUpdates = parseDropPendingUpdates(
-    process.env.TELEGRAM_DROP_PENDING_UPDATES
+    setupEnv.TELEGRAM_DROP_PENDING_UPDATES
   );
 
   await callTelegram<boolean>(token, "setWebhook", {

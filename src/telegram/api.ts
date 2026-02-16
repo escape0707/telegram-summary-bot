@@ -1,12 +1,25 @@
 const TELEGRAM_API_BASE = "https://api.telegram.org";
 
+type TelegramReplyParameters = {
+  message_id: number;
+  allow_sending_without_reply: boolean;
+};
+
+type TelegramSendMessageBody = {
+  chat_id: number;
+  text: string;
+  parse_mode?: "HTML";
+  disable_web_page_preview: boolean;
+  reply_parameters?: TelegramReplyParameters;
+};
+
 export async function sendTelegramMessage(
   token: string,
   chatId: number,
   text: string,
   replyToMessageId?: number
 ): Promise<boolean> {
-  const body: Record<string, unknown> = {
+  const body: TelegramSendMessageBody = {
     chat_id: chatId,
     text,
     parse_mode: "HTML",
@@ -32,7 +45,7 @@ export async function sendTelegramMessage(
     // Telegram rejects invalid parse entities with "can't parse entities".
     // For reliability, retry once without parse_mode.
     if (/can't parse entities/i.test(errorText)) {
-      const fallbackBody: Record<string, unknown> = {
+      const fallbackBody: TelegramSendMessageBody = {
         chat_id: chatId,
         text: `Summary (unformatted):\n\n${text}`,
         disable_web_page_preview: true

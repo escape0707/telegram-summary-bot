@@ -1,5 +1,5 @@
-import { MAX_SUMMARY_HOURS } from "../config";
-import type { TelegramMessage, TelegramMessageEntity } from "./types";
+import { MAX_SUMMARY_HOURS } from "../config.js";
+import type { TelegramMessage, TelegramMessageEntity } from "./types.js";
 
 export type SummaryCommand = { type: "summary"; fromHours: number; toHours: number };
 export type StatusCommand = { type: "status" };
@@ -46,18 +46,29 @@ function parseSummaryHours(token: string): number | undefined {
 export function parseTelegramCommand(text: string): CommandParseResult {
   const trimmed = text.trim();
   const [rawCommand, ...tokens] = trimmed.split(/\s+/);
+  if (!rawCommand) {
+    return { ok: false, reason: "unknown command" };
+  }
+
   const commandToken = rawCommand.replace(/^\//, "");
   if (!commandToken) {
     return { ok: false, reason: "unknown command" };
   }
 
-  const command = commandToken.split("@", 1)[0].toLowerCase();
+  const [commandName] = commandToken.split("@", 1);
+  if (!commandName) {
+    return { ok: false, reason: "unknown command" };
+  }
+
+  const command = commandName.toLowerCase();
   switch (command) {
     case "summary":
+      const fromToken = tokens[0];
+      const toToken = tokens[1];
+
       const rawFromHours =
-        tokens.length >= 1 ? parseSummaryHours(tokens[0]) : 1;
-      const rawToHours =
-        tokens.length >= 2 ? parseSummaryHours(tokens[1]) : 0;
+        fromToken !== undefined ? parseSummaryHours(fromToken) : 1;
+      const rawToHours = toToken !== undefined ? parseSummaryHours(toToken) : 0;
 
       if (rawFromHours === undefined || rawToHours === undefined) {
         return { ok: false, reason: "invalid arguments" };
@@ -110,4 +121,3 @@ export function hasBotCommandAtStart(
     (entity) => entity.type === "bot_command" && entity.offset === 0
   );
 }
-

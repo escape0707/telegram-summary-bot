@@ -1,6 +1,6 @@
-import { markServiceOk, recordServiceError } from "../db/serviceStats";
-import type { Env } from "../env";
-import { AppError, ErrorCode, type ErrorCode as AppErrorCode } from "./errors";
+import { markServiceOk, recordServiceError } from "../db/serviceStats.js";
+import type { Env } from "../env.js";
+import { AppError, ErrorCode, type ErrorCode as AppErrorCode } from "./errors.js";
 
 const INTERNAL_ERROR_STATUS = 500;
 

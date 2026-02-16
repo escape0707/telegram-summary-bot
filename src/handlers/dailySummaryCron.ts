@@ -1,13 +1,13 @@
-import { generateSummary } from "../ai/summary";
+import { generateSummary } from "../ai/summary.js";
 import {
   loadActiveChatsForWindow,
   loadMessagesForSummary
-} from "../db/messages";
-import type { Env } from "../env";
-import { AppError, ErrorCode } from "../ops/errors";
-import { runTrackedTask } from "../ops/serviceTracking";
-import type { SummaryCommand } from "../telegram/commands";
-import { sendTelegramMessage } from "../telegram/api";
+} from "../db/messages.js";
+import type { Env } from "../env.js";
+import { AppError, ErrorCode } from "../ops/errors.js";
+import { runTrackedTask } from "../ops/serviceTracking.js";
+import type { SummaryCommand } from "../telegram/commands.js";
+import { sendTelegramMessage } from "../telegram/api.js";
 
 const DAY_SECONDS = 24 * 60 * 60;
 

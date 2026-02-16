@@ -17,7 +17,7 @@
 		"resolveJsonModule": true,
 
     /* Allow JavaScript files to be a part of your program. Use the `checkJS` option to get errors from these files. */
-		"allowJs": true,
+		"allowJs": false,
     /* Enable error reporting in type-checked JavaScript files. */
 		"checkJs": false,
 
@@ -38,6 +38,24 @@
 		"skipLibCheck": true,
 		"types": [
 			"./worker-configuration.d.ts"
-		]
+		],
+
+    // Stricter Typechecking Options
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Style Options
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnreachableCode": false,
+
+    // Recommended Options
+    "verbatimModuleSyntax": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
 	}
 }

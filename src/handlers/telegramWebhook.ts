@@ -1,24 +1,24 @@
-import { sendTelegramMessage } from "../telegram/api";
+import { sendTelegramMessage } from "../telegram/api.js";
 import {
   buildSummaryErrorText,
   hasBotCommandAtStart,
   parseTelegramCommand
-} from "../telegram/commands";
+} from "../telegram/commands.js";
 import {
   GROUP_CHAT_TYPES,
   type TelegramMessage,
   type TelegramUpdate
-} from "../telegram/types";
-import type { Env } from "../env";
-import { TELEGRAM_SECRET_HEADER } from "../config";
+} from "../telegram/types.js";
+import type { Env } from "../env.js";
+import { TELEGRAM_SECRET_HEADER } from "../config.js";
 import {
   insertMessage,
   loadMessagesForSummary,
   type StoredMessage
-} from "../db/messages";
-import { loadServiceStatusSnapshot } from "../db/serviceStats";
-import { runTrackedResponse } from "../ops/serviceTracking";
-import { generateSummary } from "../ai/summary";
+} from "../db/messages.js";
+import { loadServiceStatusSnapshot } from "../db/serviceStats.js";
+import { runTrackedResponse } from "../ops/serviceTracking.js";
+import { generateSummary } from "../ai/summary.js";
 
 export async function handleTelegramWebhook(
   request: Request,

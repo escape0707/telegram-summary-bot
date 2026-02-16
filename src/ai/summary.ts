@@ -2,14 +2,14 @@ import {
   MAX_MESSAGE_LENGTH,
   MAX_PROMPT_CHARS,
   SUMMARY_MODEL
-} from "../config";
-import type { Env } from "../env";
-import type { StoredMessage } from "../db/messages";
-import type { SummaryCommand } from "../telegram/commands";
+} from "../config.js";
+import type { Env } from "../env.js";
+import type { StoredMessage } from "../db/messages.js";
+import type { SummaryCommand } from "../telegram/commands.js";
 import {
   buildTelegramMessageUrl,
   buildTelegramUserLink
-} from "../telegram/links";
+} from "../telegram/links.js";
 
 type SummaryAiMessage = {
   role: "system" | "user" | "assistant";

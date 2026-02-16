@@ -1,10 +1,10 @@
-import { handleDailySummaryCron } from "./handlers/dailySummaryCron";
-import { handleTelegramWebhook } from "./handlers/telegramWebhook";
+import { handleDailySummaryCron } from "./handlers/dailySummaryCron.js";
+import { handleTelegramWebhook } from "./handlers/telegramWebhook.js";
 import {
   HEALTH_PATH,
   TELEGRAM_PATH,
-} from "./config";
-import type { Env } from "./env";
+} from "./config.js";
+import type { Env } from "./env.js";
 
 export default {
   async fetch(request, env) {
