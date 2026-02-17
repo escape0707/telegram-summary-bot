@@ -3,6 +3,7 @@ import {
   loadActiveChatsForWindow,
   loadMessagesForSummary
 } from "../db/messages.js";
+import { cleanupStaleRateLimits } from "../db/rateLimits.js";
 import type { Env } from "../env.js";
 import { AppError, ErrorCode } from "../ops/errors.js";
 import { runTrackedTask } from "../ops/serviceTracking.js";
@@ -34,6 +35,17 @@ export async function handleDailySummaryCron(
 
     const windowEnd = Math.floor(controller.scheduledTime / 1_000);
     const windowStart = windowEnd - DAY_SECONDS;
+    let cleanupDeleted = 0;
+
+    try {
+      cleanupDeleted = await cleanupStaleRateLimits(env, windowEnd);
+      if (cleanupDeleted > 0) {
+        console.log("Deleted stale rate limit rows", { cleanupDeleted });
+      }
+    } catch (error) {
+      // Best-effort cleanup. Should not block daily summaries.
+      console.error("Failed to cleanup stale rate limits", error);
+    }
 
     let chats;
     try {
@@ -121,7 +133,8 @@ export async function handleDailySummaryCron(
       sentCount,
       skippedNoMessages,
       skippedNoText,
-      failedCount
+      failedCount,
+      cleanupDeleted
     });
 
     if (failedCount > 0) {

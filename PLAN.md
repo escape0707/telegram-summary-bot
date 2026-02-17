@@ -119,8 +119,8 @@ ongoing cost and operational burden.
 - [x] docs: add rate limiting plan and commit boundaries
 - [x] feat: add D1-backed rate limiting for `/summary` and `/summaryday`
 - [x] docs: document rate limiting behavior and tuning
-- [ ] feat: add stale `rate_limits` cleanup query (batched delete by `updated_at`)
-- [ ] feat: run cleanup from daily cron (best effort; log on failure)
+- [x] feat: add stale `rate_limits` cleanup query (batched delete by `updated_at`)
+- [x] feat: run cleanup from daily cron (best effort; log on failure)
 - [ ] docs: document cleanup retention window and tuning knobs
 
 ## Implementation Notes
