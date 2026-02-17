@@ -135,6 +135,15 @@ ongoing cost and operational burden.
   `handleDailySummaryCron` as a thin adapter
 - [x] docs: document retry/ack policy and updated module responsibilities
 
+### Lint + Formatting Checklist
+
+- [x] docs: add lint+format rollout plan and commit boundaries
+- [ ] chore: add Prettier config/scripts/ignore (`format`, `format:check`)
+- [ ] style: apply Prettier formatting (mechanical-only commit)
+- [ ] chore: add ESLint + `typescript-eslint` + `eslint-config-prettier`
+- [ ] chore: fix initial ESLint findings (no behavior change)
+- [ ] ci/docs: enforce `format:check` and lint in CI + contributor docs
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
@@ -149,6 +158,10 @@ ongoing cost and operational burden.
   types we handle (currently `message`, `edited_message`) to reduce noise.
 - Register bot commands (BotFather or `setMyCommands`) for `/summary`,
   `/summaryday`, `/status` so they show in the UI.
+- Code quality split:
+  - Prettier owns formatting.
+  - ESLint (`typescript-eslint`) owns code-quality and bug-prone patterns.
+  - `tsc --noEmit` owns type-checking correctness.
 
 ## Test / Validation Plan
 
