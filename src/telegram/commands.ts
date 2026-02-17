@@ -1,7 +1,11 @@
 import { MAX_SUMMARY_HOURS } from "../config.js";
 import type { TelegramMessage, TelegramMessageEntity } from "./types.js";
 
-export type SummaryCommand = { type: "summary"; fromHours: number; toHours: number };
+export type SummaryCommand = {
+  type: "summary";
+  fromHours: number;
+  toHours: number;
+};
 export type StatusCommand = { type: "status" };
 
 export type ParsedCommand = SummaryCommand | StatusCommand;
@@ -18,7 +22,9 @@ export type CommandParseErrorReason = Extract<
   { ok: false }
 >["reason"];
 
-export function buildCommandParseErrorText(reason: CommandParseErrorReason): string {
+export function buildCommandParseErrorText(
+  reason: CommandParseErrorReason,
+): string {
   if (reason === "exceeds max hours") {
     return `Max summary window is ${MAX_SUMMARY_HOURS}h.`;
   }
@@ -92,13 +98,13 @@ export function parseTelegramCommand(text: string): CommandParseResult {
         command: {
           type: "summary",
           fromHours: normalizedFromHours,
-          toHours: normalizedToHours
-        }
+          toHours: normalizedToHours,
+        },
       };
     case "summaryday":
       return {
         ok: true,
-        command: { type: "summary", fromHours: 24, toHours: 0 }
+        command: { type: "summary", fromHours: 24, toHours: 0 },
       };
     case "status":
       return { ok: true, command: { type: "status" } };
@@ -108,7 +114,7 @@ export function parseTelegramCommand(text: string): CommandParseResult {
 }
 
 export function hasBotCommandAtStart(
-  message: TelegramMessage
+  message: TelegramMessage,
 ): message is TelegramMessage & {
   text: string;
   entities: TelegramMessageEntity[];
@@ -118,6 +124,6 @@ export function hasBotCommandAtStart(
   }
 
   return message.entities.some(
-    (entity) => entity.type === "bot_command" && entity.offset === 0
+    (entity) => entity.type === "bot_command" && entity.offset === 0,
   );
 }

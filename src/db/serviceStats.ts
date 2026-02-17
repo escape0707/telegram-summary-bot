@@ -28,17 +28,20 @@ function nowSeconds(): number {
 }
 
 function normalizeErrorMessage(errorMessage: string): string {
-  return errorMessage.replace(/\s+/g, " ").trim().slice(0, MAX_LAST_ERROR_CHARS);
+  return errorMessage
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_LAST_ERROR_CHARS);
 }
 
 export async function markServiceOk(
   env: Env,
-  timestampSeconds: number = nowSeconds()
+  timestampSeconds: number = nowSeconds(),
 ): Promise<void> {
   await env.DB.prepare(
     `UPDATE service_stats
      SET last_ok_ts = ?
-     WHERE id = 1`
+     WHERE id = 1`,
   )
     .bind(timestampSeconds)
     .run();
@@ -46,20 +49,20 @@ export async function markServiceOk(
 
 export async function recordServiceError(
   env: Env,
-  errorMessage: string
+  errorMessage: string,
 ): Promise<void> {
   await env.DB.prepare(
     `UPDATE service_stats
      SET error_count = error_count + 1,
          last_error = ?
-     WHERE id = 1`
+     WHERE id = 1`,
   )
     .bind(normalizeErrorMessage(errorMessage))
     .run();
 }
 
 export async function loadServiceStatusSnapshot(
-  env: Env
+  env: Env,
 ): Promise<ServiceStatusSnapshot> {
   const currentNowSeconds = nowSeconds();
 
@@ -67,13 +70,13 @@ export async function loadServiceStatusSnapshot(
     `SELECT uptime_start, last_ok_ts, error_count, last_error
      FROM service_stats
      WHERE id = 1
-     LIMIT 1`
+     LIMIT 1`,
   ).first<ServiceStatsRow>();
 
   const storageCountsResult = await env.DB.prepare(
     `SELECT
       (SELECT COUNT(*) FROM messages) AS message_count,
-      (SELECT COUNT(*) FROM summaries) AS summary_count`
+      (SELECT COUNT(*) FROM summaries) AS summary_count`,
   ).first<StorageCountsRow>();
 
   return {
@@ -82,6 +85,6 @@ export async function loadServiceStatusSnapshot(
     errorCount: serviceStatsResult?.error_count ?? 0,
     lastError: serviceStatsResult?.last_error ?? null,
     messageCount: storageCountsResult?.message_count ?? 0,
-    summaryCount: storageCountsResult?.summary_count ?? 0
+    summaryCount: storageCountsResult?.summary_count ?? 0,
   };
 }

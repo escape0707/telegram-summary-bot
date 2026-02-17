@@ -16,7 +16,7 @@ export function buildDailySummaryMessage(summary: string): string {
 }
 
 export function buildSummaryRateLimitText(
-  rateLimit: Exclude<SummaryRateLimitResult, { allowed: true }>
+  rateLimit: Exclude<SummaryRateLimitResult, { allowed: true }>,
 ): string {
   const target = rateLimit.scope === "user" ? "you" : "this chat";
   const windowMinutes = Math.floor(rateLimit.windowSeconds / 60);
@@ -24,13 +24,13 @@ export function buildSummaryRateLimitText(
   return [
     `Rate limit exceeded for ${target}.`,
     `Limit: ${rateLimit.limit} summaries per ${windowMinutes} minutes.`,
-    `Try again in ${formatRetryAfter(rateLimit.retryAfterSeconds)}.`
+    `Try again in ${formatRetryAfter(rateLimit.retryAfterSeconds)}.`,
   ].join(" ");
 }
 
 export function buildStatusText(
   status: StatusTextSnapshot,
-  nowSeconds: number
+  nowSeconds: number,
 ): string {
   const uptimeSeconds = Math.max(0, nowSeconds - status.uptimeStart);
 
@@ -51,7 +51,7 @@ export function buildStatusText(
     `Last OK: ${lastOkText}`,
     `Last error: ${lastErrorText}`,
     `Stored messages: ${status.messageCount}`,
-    `Stored summaries: ${status.summaryCount}`
+    `Stored summaries: ${status.summaryCount}`,
   ].join("\n");
 }
 

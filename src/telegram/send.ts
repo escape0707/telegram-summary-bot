@@ -16,15 +16,20 @@ export function getBotToken(env: Env): string | undefined {
 export async function sendReplyToMessage(
   botToken: string,
   message: TelegramReplyTarget,
-  text: string
+  text: string,
 ): Promise<boolean> {
-  return sendTelegramMessage(botToken, message.chat.id, text, message.message_id);
+  return sendTelegramMessage(
+    botToken,
+    message.chat.id,
+    text,
+    message.message_id,
+  );
 }
 
 export async function sendMessageToChat(
   botToken: string,
   chatId: number,
-  text: string
+  text: string,
 ): Promise<boolean> {
   return sendTelegramMessage(botToken, chatId, text);
 }

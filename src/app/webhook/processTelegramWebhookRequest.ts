@@ -5,28 +5,28 @@ import { loadServiceStatusSnapshot } from "../../db/serviceStats.js";
 import type { Env } from "../../env.js";
 import {
   summarizeWindow,
-  type WindowSummaryResult
+  type WindowSummaryResult,
 } from "../summary/summarizeWindow.js";
 import {
   buildCommandParseErrorText,
   hasBotCommandAtStart,
   parseTelegramCommand,
-  type SummaryCommand
+  type SummaryCommand,
 } from "../../telegram/commands.js";
 import { getBotToken, sendReplyToMessage } from "../../telegram/send.js";
 import {
   buildStatusText,
-  buildSummaryRateLimitText
+  buildSummaryRateLimitText,
 } from "../../telegram/texts.js";
 import {
   GROUP_CHAT_TYPES,
   type TelegramMessage,
-  type TelegramUpdate
+  type TelegramUpdate,
 } from "../../telegram/types.js";
 
 export async function processTelegramWebhookRequest(
   request: Request,
-  env: Env
+  env: Env,
 ): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("method not allowed", { status: 405 });
@@ -75,7 +75,10 @@ export async function processTelegramWebhookRequest(
   return new Response("ok", { status: 200 });
 }
 
-async function ingestMessage(env: Env, message: TelegramMessage): Promise<void> {
+async function ingestMessage(
+  env: Env,
+  message: TelegramMessage,
+): Promise<void> {
   const text = message.text ?? message.caption ?? null;
   const replyToMessageId = message.reply_to_message?.message_id ?? null;
   const userId = message.from?.id ?? null;
@@ -90,13 +93,13 @@ async function ingestMessage(env: Env, message: TelegramMessage): Promise<void> 
     username,
     text,
     ts: message.date,
-    replyToMessageId
+    replyToMessageId,
   });
 }
 
 async function tryHandleCommand(
   env: Env,
-  message: TelegramMessage & { text: string }
+  message: TelegramMessage & { text: string },
 ): Promise<Response | undefined> {
   const commandResult = parseTelegramCommand(message.text);
   if (!commandResult.ok) {
@@ -112,7 +115,11 @@ async function tryHandleCommand(
   const command = commandResult.command;
   switch (command.type) {
     case "summary": {
-      const replyText = await resolveSummaryCommandReplyText(env, message, command);
+      const replyText = await resolveSummaryCommandReplyText(
+        env,
+        message,
+        command,
+      );
       return sendCommandReply(env, message, replyText);
     }
     case "status": {
@@ -135,14 +142,14 @@ async function tryHandleCommand(
 async function resolveSummaryCommandReplyText(
   env: Env,
   message: TelegramMessage & { text: string },
-  command: SummaryCommand
+  command: SummaryCommand,
 ): Promise<string> {
   try {
     const rateLimit = await enforceSummaryRateLimit(
       env,
       message.chat.id,
       message.from?.id ?? null,
-      message.date
+      message.date,
     );
     if (!rateLimit.allowed) {
       return buildSummaryRateLimitText(rateLimit);
@@ -162,7 +169,7 @@ async function resolveSummaryCommandReplyText(
       chatUsername: message.chat.username,
       windowStart,
       windowEnd,
-      command
+      command,
     });
   } catch (error) {
     console.error("Failed to load messages for summary", error);
@@ -190,7 +197,7 @@ async function resolveSummaryCommandReplyText(
 async function sendCommandReply(
   env: Env,
   message: TelegramMessage & { text: string },
-  replyText: string
+  replyText: string,
 ): Promise<Response> {
   const botToken = getBotToken(env);
   if (!botToken) {

@@ -69,9 +69,11 @@ ongoing cost and operational burden.
   - User link format for users:
 
     ```tsx
-    const userLink = username
-      ? <a href={`https://t.me/${username}`}>@{username}</a>
-      : <a href={`tg://user?id=${userId}`}>user:{userId}</a>;
+    const userLink = username ? (
+      <a href={`https://t.me/${username}`}>@{username}</a>
+    ) : (
+      <a href={`tg://user?id=${userId}`}>user:{userId}</a>
+    );
     ```
 
   - Message link format:
@@ -99,7 +101,7 @@ ongoing cost and operational burden.
 - [x] feat: command parsing + window parsing
 - [x] feat: summary command (stub response)
 - [x] feat: workers-ai summarization (shared pipeline) (without format
-  instruction prompt engineering)
+      instruction prompt engineering)
 - [x] feat: prompt engineer HTML SVO formatting (topic clusters + user/message links)
 - [x] feat: status/usage command
 - [x] feat: cron trigger + daily summary dispatch
@@ -126,20 +128,20 @@ ongoing cost and operational burden.
 ### Handler Refactor Checklist
 
 - [x] docs: add refactor plan and commit boundaries (thin handlers + extracted
-  application logic)
+      application logic)
 - [x] refactor: extract Telegram reply helpers and user-facing text builders to
-  dedicated modules (no behavior change)
+      dedicated modules (no behavior change)
 - [x] refactor: split webhook logic into application-level flow and keep
-  `handleTelegramWebhook` as a thin adapter
+      `handleTelegramWebhook` as a thin adapter
 - [x] refactor: split daily cron logic into application-level flow and keep
-  `handleDailySummaryCron` as a thin adapter
+      `handleDailySummaryCron` as a thin adapter
 - [x] docs: document retry/ack policy and updated module responsibilities
 
 ### Lint + Formatting Checklist
 
 - [x] docs: add lint+format rollout plan and commit boundaries
 - [x] chore: add Prettier config/scripts/ignore (`format`, `format:check`)
-- [ ] style: apply Prettier formatting (mechanical-only commit)
+- [x] style: apply Prettier formatting (mechanical-only commit)
 - [ ] chore: add ESLint + `typescript-eslint` + `eslint-config-prettier`
 - [ ] chore: fix initial ESLint findings (no behavior change)
 - [ ] ci/docs: enforce `format:check` and lint in CI + contributor docs

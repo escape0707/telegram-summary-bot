@@ -37,19 +37,19 @@ export function buildTelegramUserLink(options: {
   if (username) {
     return {
       label: `@${username}`,
-      url: `https://t.me/${username}`
+      url: `https://t.me/${username}`,
     };
   }
 
   if (typeof options.userId === "number") {
     return {
       label: `user:${options.userId}`,
-      url: `tg://user?id=${options.userId}`
+      url: `tg://user?id=${options.userId}`,
     };
   }
 
   return {
     label: "user:unknown",
-    url: "unknown"
+    url: "unknown",
   };
 }

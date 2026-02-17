@@ -17,13 +17,13 @@ type SummarizeWindowInput = {
 
 export async function summarizeWindow(
   env: Env,
-  input: SummarizeWindowInput
+  input: SummarizeWindowInput,
 ): Promise<WindowSummaryResult> {
   const rows = await loadMessagesForSummary(
     env,
     input.chatId,
     input.windowStart,
-    input.windowEnd
+    input.windowEnd,
   );
   if (rows.length === 0) {
     return { ok: false, reason: "no_messages" };
@@ -34,7 +34,7 @@ export async function summarizeWindow(
     rows.slice().reverse(),
     input.command,
     input.chatId,
-    input.chatUsername
+    input.chatUsername,
   );
   if (summaryResult.ok) {
     return { ok: true, summary: summaryResult.summary };

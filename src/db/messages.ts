@@ -30,7 +30,10 @@ type ActiveChatRow = {
   chat_username: string | null;
 };
 
-export async function insertMessage(env: Env, message: MessageInsert): Promise<void> {
+export async function insertMessage(
+  env: Env,
+  message: MessageInsert,
+): Promise<void> {
   await env.DB.prepare(
     `INSERT OR IGNORE INTO messages (
       chat_id,
@@ -41,7 +44,7 @@ export async function insertMessage(env: Env, message: MessageInsert): Promise<v
       text,
       ts,
       reply_to_message_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       message.chatId,
@@ -51,7 +54,7 @@ export async function insertMessage(env: Env, message: MessageInsert): Promise<v
       message.username,
       message.text,
       message.ts,
-      message.replyToMessageId
+      message.replyToMessageId,
     )
     .run();
 }
@@ -60,14 +63,14 @@ export async function loadMessagesForSummary(
   env: Env,
   chatId: number,
   windowStart: number,
-  windowEnd: number
+  windowEnd: number,
 ): Promise<StoredMessage[]> {
   const result = await env.DB.prepare(
     `SELECT message_id, user_id, username, text, ts
      FROM messages
      WHERE chat_id = ? AND ts BETWEEN ? AND ?
      ORDER BY ts DESC
-     LIMIT ${MAX_MESSAGES_FOR_SUMMARY}`
+     LIMIT ${MAX_MESSAGES_FOR_SUMMARY}`,
   )
     .bind(chatId, windowStart, windowEnd)
     .all<StoredMessage>();
@@ -78,19 +81,19 @@ export async function loadMessagesForSummary(
 export async function loadActiveChatsForWindow(
   env: Env,
   windowStart: number,
-  windowEnd: number
+  windowEnd: number,
 ): Promise<ActiveChat[]> {
   const result = await env.DB.prepare(
     `SELECT chat_id, MAX(chat_username) AS chat_username
      FROM messages
      WHERE ts BETWEEN ? AND ?
-     GROUP BY chat_id`
+     GROUP BY chat_id`,
   )
     .bind(windowStart, windowEnd)
     .all<ActiveChatRow>();
 
   return (result.results ?? []).map((row) => ({
     chatId: row.chat_id,
-    chatUsername: row.chat_username
+    chatUsername: row.chat_username,
   }));
 }

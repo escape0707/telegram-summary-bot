@@ -42,7 +42,6 @@ This runbook covers setup, deploy, verification, and basic recovery for
    ```
 
 2. In Telegram group:
-
    - Send regular messages.
    - Run `/summary`.
    - Run `/summaryday`.

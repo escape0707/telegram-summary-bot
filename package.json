@@ -1,26 +1,26 @@
 {
-	"name": "telegram-summary-bot",
-	"version": "0.0.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev --test-scheduled",
-		"start": "wrangler dev --test-scheduled",
-		"telegram:setup": "tsx scripts/setup-telegram.ts",
-		"lint:md": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.wrangler\"",
-		"format": "prettier . --write",
-		"format:check": "prettier . --check",
-		"cf-typegen": "wrangler types"
-	},
-	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20260214.0",
-		"@types/node": "^25.2.3",
-		"markdownlint-cli2": "^0.21.0",
-		"prettier": "^3.8.1",
-		"tsx": "^4.21.0",
-		"typescript": "^5.9.3",
-		"wrangler": "^4.65.0"
-	},
-	"packageManager": "pnpm@11.0.0-dev.1005+sha512.91f84a392eea348ea4852a182912d2520273a4336f933b78cc44bc931eb999923c097e9433a9b355adc1f725725ea99082fc9f032a559df832632e764c92c798"
+  "name": "telegram-summary-bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --test-scheduled",
+    "start": "wrangler dev --test-scheduled",
+    "telegram:setup": "tsx scripts/setup-telegram.ts",
+    "lint:md": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.wrangler\"",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260214.0",
+    "@types/node": "^25.2.3",
+    "markdownlint-cli2": "^0.21.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.65.0"
+  },
+  "packageManager": "pnpm@11.0.0-dev.1005+sha512.91f84a392eea348ea4852a182912d2520273a4336f933b78cc44bc931eb999923c097e9433a9b355adc1f725725ea99082fc9f032a559df832632e764c92c798"
 }

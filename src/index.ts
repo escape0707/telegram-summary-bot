@@ -1,9 +1,6 @@
 import { handleDailySummaryCron } from "./handlers/dailySummaryCron.js";
 import { handleTelegramWebhook } from "./handlers/telegramWebhook.js";
-import {
-  HEALTH_PATH,
-  TELEGRAM_PATH,
-} from "./config.js";
+import { HEALTH_PATH, TELEGRAM_PATH } from "./config.js";
 import type { Env } from "./env.js";
 
 export default {
@@ -21,5 +18,5 @@ export default {
   },
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(handleDailySummaryCron(controller, env));
-  }
+  },
 } satisfies ExportedHandler<Env>;

@@ -3,7 +3,7 @@ export const ErrorCode = {
   DbQueryFailed: "DB_QUERY_FAILED",
   CronDispatchPartialFailure: "CRON_DISPATCH_PARTIAL_FAILURE",
   ResponseStatus: "RESPONSE_STATUS",
-  UnhandledException: "UNHANDLED_EXCEPTION"
+  UnhandledException: "UNHANDLED_EXCEPTION",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

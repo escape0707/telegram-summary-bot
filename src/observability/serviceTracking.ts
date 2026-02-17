@@ -3,7 +3,7 @@ import type { Env } from "../env.js";
 import {
   AppError,
   ErrorCode,
-  type ErrorCode as AppErrorCode
+  type ErrorCode as AppErrorCode,
 } from "../errors/appError.js";
 
 const INTERNAL_ERROR_STATUS = 500;
@@ -38,7 +38,7 @@ async function safeRecordServiceError(
   env: Env,
   operation: string,
   code: AppErrorCode,
-  detail: string
+  detail: string,
 ): Promise<void> {
   try {
     await recordServiceError(env, `${operation} [${code}] ${detail}`);
@@ -47,7 +47,7 @@ async function safeRecordServiceError(
       operation,
       code,
       detail,
-      error
+      error,
     });
   }
 }
@@ -55,7 +55,7 @@ async function safeRecordServiceError(
 export async function runTrackedResponse(
   env: Env,
   operation: string,
-  run: () => Promise<Response>
+  run: () => Promise<Response>,
 ): Promise<Response> {
   try {
     const response = await run();
@@ -64,7 +64,7 @@ export async function runTrackedResponse(
         env,
         operation,
         ErrorCode.ResponseStatus,
-        `status=${response.status}`
+        `status=${response.status}`,
       );
     } else {
       await safeMarkServiceOk(env);
@@ -73,7 +73,12 @@ export async function runTrackedResponse(
   } catch (error) {
     const trackedError = getTrackedError(error);
     console.error(`${operation} failed`, { trackedError, error });
-    await safeRecordServiceError(env, operation, trackedError.code, trackedError.detail);
+    await safeRecordServiceError(
+      env,
+      operation,
+      trackedError.code,
+      trackedError.detail,
+    );
     return new Response("internal error", { status: 500 });
   }
 }
@@ -81,7 +86,7 @@ export async function runTrackedResponse(
 export async function runTrackedTask(
   env: Env,
   operation: string,
-  run: () => Promise<void>
+  run: () => Promise<void>,
 ): Promise<void> {
   try {
     await run();
@@ -89,6 +94,11 @@ export async function runTrackedTask(
   } catch (error) {
     const trackedError = getTrackedError(error);
     console.error(`${operation} failed`, { trackedError, error });
-    await safeRecordServiceError(env, operation, trackedError.code, trackedError.detail);
+    await safeRecordServiceError(
+      env,
+      operation,
+      trackedError.code,
+      trackedError.detail,
+    );
   }
 }

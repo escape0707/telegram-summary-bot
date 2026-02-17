@@ -12,19 +12,19 @@ const DAY_SECONDS = 24 * 60 * 60;
 const DAILY_SUMMARY_COMMAND: SummaryCommand = {
   type: "summary",
   fromHours: 24,
-  toHours: 0
+  toHours: 0,
 };
 
 export async function runDailySummary(
   controller: ScheduledController,
-  env: Env
+  env: Env,
 ): Promise<void> {
   const botToken = getBotToken(env);
   if (!botToken) {
     console.error("TELEGRAM_BOT_TOKEN is not configured");
     throw new AppError(
       ErrorCode.ConfigMissing,
-      "TELEGRAM_BOT_TOKEN is not configured"
+      "TELEGRAM_BOT_TOKEN is not configured",
     );
   }
 
@@ -53,7 +53,7 @@ export async function runDailySummary(
   console.log("Daily summary cron started", {
     cron: controller.cron,
     scheduledTime: new Date(controller.scheduledTime).toISOString(),
-    activeChats: chats.length
+    activeChats: chats.length,
   });
 
   let sentCount = 0;
@@ -69,7 +69,7 @@ export async function runDailySummary(
         chatUsername: chat.chatUsername ?? undefined,
         windowStart,
         windowEnd,
-        command: DAILY_SUMMARY_COMMAND
+        command: DAILY_SUMMARY_COMMAND,
       });
 
       if (!summaryResult.ok) {
@@ -85,12 +85,14 @@ export async function runDailySummary(
             firstFailureReason ??= `summary generation failed for chat ${chat.chatId}`;
             console.error("Failed to generate daily summary", {
               chatId: chat.chatId,
-              reason: summaryResult.reason
+              reason: summaryResult.reason,
             });
             break;
           default: {
             const exhaustiveCheck: never = summaryResult.reason;
-            throw new Error(`Unhandled summary result reason: ${exhaustiveCheck}`);
+            throw new Error(
+              `Unhandled summary result reason: ${exhaustiveCheck}`,
+            );
           }
         }
         continue;
@@ -99,7 +101,7 @@ export async function runDailySummary(
       const sent = await sendMessageToChat(
         botToken,
         chat.chatId,
-        buildDailySummaryMessage(summaryResult.summary)
+        buildDailySummaryMessage(summaryResult.summary),
       );
       if (sent) {
         sentCount += 1;
@@ -107,7 +109,7 @@ export async function runDailySummary(
         failedCount += 1;
         firstFailureReason ??= `telegram send failed for chat ${chat.chatId}`;
         console.error("Failed to send daily summary", {
-          chatId: chat.chatId
+          chatId: chat.chatId,
         });
       }
     } catch (error) {
@@ -115,7 +117,7 @@ export async function runDailySummary(
       firstFailureReason ??= `dispatch exception for chat ${chat.chatId}`;
       console.error("Daily summary dispatch failed", {
         chatId: chat.chatId,
-        error
+        error,
       });
     }
   }
@@ -128,13 +130,13 @@ export async function runDailySummary(
     skippedNoMessages,
     skippedNoText,
     failedCount,
-    cleanupDeleted
+    cleanupDeleted,
   });
 
   if (failedCount > 0) {
     throw new AppError(
       ErrorCode.CronDispatchPartialFailure,
-      `completed with ${failedCount} failures (${firstFailureReason ?? "unknown"})`
+      `completed with ${failedCount} failures (${firstFailureReason ?? "unknown"})`,
     );
   }
 }

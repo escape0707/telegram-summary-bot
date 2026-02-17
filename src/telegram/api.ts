@@ -17,25 +17,25 @@ export async function sendTelegramMessage(
   token: string,
   chatId: number,
   text: string,
-  replyToMessageId?: number
+  replyToMessageId?: number,
 ): Promise<boolean> {
   const body: TelegramSendMessageBody = {
     chat_id: chatId,
     text,
     parse_mode: "HTML",
-    disable_web_page_preview: true
+    disable_web_page_preview: true,
   };
   if (typeof replyToMessageId === "number") {
     body.reply_parameters = {
       message_id: replyToMessageId,
-      allow_sending_without_reply: true
+      allow_sending_without_reply: true,
     };
   }
 
   const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -48,12 +48,12 @@ export async function sendTelegramMessage(
       const fallbackBody: TelegramSendMessageBody = {
         chat_id: chatId,
         text: `Summary (unformatted):\n\n${text}`,
-        disable_web_page_preview: true
+        disable_web_page_preview: true,
       };
       if (typeof replyToMessageId === "number") {
         fallbackBody.reply_parameters = {
           message_id: replyToMessageId,
-          allow_sending_without_reply: true
+          allow_sending_without_reply: true,
         };
       }
 
@@ -62,14 +62,14 @@ export async function sendTelegramMessage(
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(fallbackBody)
-        }
+          body: JSON.stringify(fallbackBody),
+        },
       );
 
       if (!fallbackResponse.ok) {
         console.error(
           "Failed to sendMessage (fallback)",
-          await fallbackResponse.text()
+          await fallbackResponse.text(),
         );
         return false;
       }

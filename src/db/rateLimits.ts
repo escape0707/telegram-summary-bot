@@ -4,7 +4,7 @@ import {
   RATE_LIMIT_CLEANUP_RETENTION_SECONDS,
   SUMMARY_RATE_LIMIT_CHAT_LIMIT,
   SUMMARY_RATE_LIMIT_USER_LIMIT,
-  SUMMARY_RATE_LIMIT_WINDOW_SECONDS
+  SUMMARY_RATE_LIMIT_WINDOW_SECONDS,
 } from "../config.js";
 import type { Env } from "../env.js";
 
@@ -29,14 +29,17 @@ type RunMetaWithChanges = {
   changes?: number;
 };
 
-function windowStartFor(timestampSeconds: number, windowSeconds: number): number {
+function windowStartFor(
+  timestampSeconds: number,
+  windowSeconds: number,
+): number {
   return Math.floor(timestampSeconds / windowSeconds) * windowSeconds;
 }
 
 function retryAfterSeconds(
   timestampSeconds: number,
   windowStart: number,
-  windowSeconds: number
+  windowSeconds: number,
 ): number {
   const remaining = windowStart + windowSeconds - timestampSeconds;
   return Math.max(1, remaining);
@@ -47,7 +50,7 @@ async function incrementWindowCounter(
   bucket: string,
   scopeKey: string,
   windowStart: number,
-  nowSeconds: number
+  nowSeconds: number,
 ): Promise<number> {
   const upsert = env.DB.prepare(
     `INSERT INTO rate_limits (
@@ -60,14 +63,14 @@ async function incrementWindowCounter(
     ON CONFLICT(bucket, scope_key, window_start)
     DO UPDATE SET
       count = count + 1,
-      updated_at = excluded.updated_at`
+      updated_at = excluded.updated_at`,
   ).bind(bucket, scopeKey, windowStart, nowSeconds);
 
   const select = env.DB.prepare(
     `SELECT count
      FROM rate_limits
      WHERE bucket = ? AND scope_key = ? AND window_start = ?
-     LIMIT 1`
+     LIMIT 1`,
   ).bind(bucket, scopeKey, windowStart);
 
   const results = await env.DB.batch([upsert, select]);
@@ -84,7 +87,7 @@ export async function enforceSummaryRateLimit(
   env: Env,
   chatId: number,
   userId: number | null,
-  nowSeconds: number
+  nowSeconds: number,
 ): Promise<SummaryRateLimitResult> {
   const windowSeconds = SUMMARY_RATE_LIMIT_WINDOW_SECONDS;
   const windowStart = windowStartFor(nowSeconds, windowSeconds);
@@ -96,7 +99,7 @@ export async function enforceSummaryRateLimit(
       SUMMARY_USER_IN_CHAT_BUCKET,
       userScopeKey,
       windowStart,
-      nowSeconds
+      nowSeconds,
     );
     if (userCount > SUMMARY_RATE_LIMIT_USER_LIMIT) {
       return {
@@ -104,7 +107,11 @@ export async function enforceSummaryRateLimit(
         scope: "user",
         limit: SUMMARY_RATE_LIMIT_USER_LIMIT,
         windowSeconds,
-        retryAfterSeconds: retryAfterSeconds(nowSeconds, windowStart, windowSeconds)
+        retryAfterSeconds: retryAfterSeconds(
+          nowSeconds,
+          windowStart,
+          windowSeconds,
+        ),
       };
     }
   }
@@ -115,7 +122,7 @@ export async function enforceSummaryRateLimit(
     SUMMARY_CHAT_BUCKET,
     chatScopeKey,
     windowStart,
-    nowSeconds
+    nowSeconds,
   );
   if (chatCount > SUMMARY_RATE_LIMIT_CHAT_LIMIT) {
     return {
@@ -123,7 +130,11 @@ export async function enforceSummaryRateLimit(
       scope: "chat",
       limit: SUMMARY_RATE_LIMIT_CHAT_LIMIT,
       windowSeconds,
-      retryAfterSeconds: retryAfterSeconds(nowSeconds, windowStart, windowSeconds)
+      retryAfterSeconds: retryAfterSeconds(
+        nowSeconds,
+        windowStart,
+        windowSeconds,
+      ),
     };
   }
 
@@ -133,7 +144,7 @@ export async function enforceSummaryRateLimit(
 async function deleteStaleRateLimitsBatch(
   env: Env,
   cutoffSeconds: number,
-  batchSize: number
+  batchSize: number,
 ): Promise<number> {
   const result = await env.DB.prepare(
     `DELETE FROM rate_limits
@@ -143,7 +154,7 @@ async function deleteStaleRateLimitsBatch(
        WHERE updated_at < ?
        ORDER BY updated_at
        LIMIT ?
-     )`
+     )`,
   )
     .bind(cutoffSeconds, batchSize)
     .run();
@@ -156,7 +167,7 @@ async function deleteStaleRateLimitsBatch(
 export async function cleanupStaleRateLimits(
   env: Env,
   nowSeconds: number,
-  retentionSeconds: number = RATE_LIMIT_CLEANUP_RETENTION_SECONDS
+  retentionSeconds: number = RATE_LIMIT_CLEANUP_RETENTION_SECONDS,
 ): Promise<number> {
   const cutoffSeconds = nowSeconds - retentionSeconds;
   let deleted = 0;
@@ -165,7 +176,7 @@ export async function cleanupStaleRateLimits(
     const removed = await deleteStaleRateLimitsBatch(
       env,
       cutoffSeconds,
-      RATE_LIMIT_CLEANUP_BATCH_SIZE
+      RATE_LIMIT_CLEANUP_BATCH_SIZE,
     );
     if (removed === 0) {
       break;

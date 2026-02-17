@@ -57,4 +57,3 @@ export type TelegramUpdate = {
 };
 
 export const GROUP_CHAT_TYPES: TelegramChatType[] = ["group", "supergroup"];
-

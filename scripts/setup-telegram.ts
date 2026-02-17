@@ -10,8 +10,11 @@ type BotCommand = {
 
 const BOT_COMMANDS: BotCommand[] = [
   { command: "summary", description: "Summarize recent chat messages" },
-  { command: "summaryday", description: "Summarize messages from the last 24h" },
-  { command: "status", description: "Show service status and counters" }
+  {
+    command: "summaryday",
+    description: "Summarize messages from the last 24h",
+  },
+  { command: "status", description: "Show service status and counters" },
 ];
 
 type TelegramApiResponse<T> = {
@@ -56,12 +59,12 @@ function parseDropPendingUpdates(raw?: string): boolean {
 async function callTelegram<T>(
   token: string,
   method: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
 ): Promise<T> {
   const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   });
 
   const result = (await response.json()) as TelegramApiResponse<T>;
@@ -84,24 +87,27 @@ async function main(): Promise<void> {
   const webhookSecret = requireEnv("TELEGRAM_WEBHOOK_SECRET");
   const allowedUpdates = parseAllowedUpdates(setupEnv.TELEGRAM_ALLOWED_UPDATES);
   const dropPendingUpdates = parseDropPendingUpdates(
-    setupEnv.TELEGRAM_DROP_PENDING_UPDATES
+    setupEnv.TELEGRAM_DROP_PENDING_UPDATES,
   );
 
   await callTelegram<boolean>(token, "setWebhook", {
     url: webhookUrl,
     secret_token: webhookSecret,
     allowed_updates: allowedUpdates,
-    drop_pending_updates: dropPendingUpdates
+    drop_pending_updates: dropPendingUpdates,
   });
 
   await callTelegram<boolean>(token, "setMyCommands", {
-    commands: BOT_COMMANDS
+    commands: BOT_COMMANDS,
   });
 
   console.log("Telegram webhook and commands configured.");
   console.log("Webhook URL:", webhookUrl);
   console.log("Allowed updates:", allowedUpdates.join(", "));
-  console.log("Commands:", BOT_COMMANDS.map((cmd) => `/${cmd.command}`).join(", "));
+  console.log(
+    "Commands:",
+    BOT_COMMANDS.map((cmd) => `/${cmd.command}`).join(", "),
+  );
 }
 
 main().catch((error) => {
