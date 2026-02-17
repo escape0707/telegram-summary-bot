@@ -138,11 +138,6 @@ export async function generateSummary(
 
   let result: unknown;
   try {
-    console.log("Workers AI summary input", {
-      windowText,
-      messages: content
-    });
-
     result = await env.AI.run(SUMMARY_MODEL, {
       messages: messagesPrompt,
       max_tokens: SUMMARY_MAX_TOKENS
@@ -154,11 +149,9 @@ export async function generateSummary(
 
   const rawText = extractWorkersAiText(result);
   if (rawText === undefined) {
-    console.error("Unexpected Workers AI output format", result);
+    console.error("Unexpected Workers AI output format");
     return { ok: false, reason: "ai_error" };
   }
-
-  console.log("Workers AI raw summary output", rawText);
 
   const trimmed = rawText.trim();
   return trimmed
