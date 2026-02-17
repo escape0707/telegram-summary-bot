@@ -28,6 +28,10 @@ ongoing cost and operational burden.
 ## Assumptions & Constraints
 
 - Bot is added to groups and set as admin; privacy mode disabled.
+- This project is self-hosted and operator-managed, not a public multi-tenant
+  SaaS bot service.
+- Operator is expected to have basic Telegram Bot + Cloudflare Workers
+  knowledge and to actively participate in groups where the bot is installed.
 - No data retention limit for now (messages stored indefinitely).
 - Free-tier limits must be respected: Workers, D1, Workers AI.
 - Daily summary time is fixed at 17:00 JST for now (future: per-group setting).
@@ -55,6 +59,8 @@ ongoing cost and operational burden.
     N,M in 0..168; require N > M; optional 'h')
   - /summaryday (alias of /summary 24h)
   - /status
+  - /help
+  - /start
 - Summary format (for one topic cluster):
   - Topic, then SVO (Subject-Verb-Object) entries: Subject is a clickable user
     link; Verb is clickable message link text (e.g.
@@ -155,10 +161,30 @@ ongoing cost and operational burden.
 - [x] chore: fix remaining strict findings manually (no behavior change)
 - [x] docs: record strict preset choice and validation outcomes
 
+### Access Control & Onboarding Checklist
+
+- [x] docs: add auth/onboarding plan and commit boundaries
+- [ ] feat: add `TELEGRAM_ALLOWED_CHAT_IDS` env parsing helper
+- [ ] feat: enforce chat allowlist for webhook command handling, message ingest,
+  and daily cron dispatch
+- [ ] feat: reply with self-host guidance when blocked commands come from
+  non-allowlisted chats (include current `chat.id` in reply so setup does not
+  require log inspection)
+- [ ] feat: add `/help` and `/start` command responses with usage and project
+  link (`/help` available in allowed groups and DMs)
+- [ ] chore: register `/help` and `/start` in Telegram setup script
+- [ ] docs: add explicit self-host/operator-responsibility disclaimer for repo
+  visitors and random bot DMs
+- [ ] docs: update README + ops runbook for allowlist setup and user onboarding
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
-  `WORKERS_AI_*`, `D1_DATABASE_*`.
+  `TELEGRAM_ALLOWED_CHAT_IDS`, `WORKERS_AI_*`, `D1_DATABASE_*`.
+- `TELEGRAM_ALLOWED_CHAT_IDS` is a comma-separated list of numeric Telegram
+  chat IDs that are allowed to use this deployment. Use Wrangler Secrets for
+  production deployments (`wrangler secret put TELEGRAM_ALLOWED_CHAT_IDS`).
+  Local dev may use `.dev.vars`.
 - Summary windows are hour-based: `/summary [Nh [Mh]]` uses the range from N
   hours before to M hours before, defaulting to 1h→0h.
 - Bot command messages are handled for commands but excluded from message storage.
