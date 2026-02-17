@@ -64,6 +64,33 @@ This runbook covers setup, deploy, verification, and basic recovery for
 For short-interval testing, temporarily change cron schedule, deploy, verify,
 then revert.
 
+## Runtime Structure
+
+- `src/handlers/telegramWebhook.ts`:
+  thin tracked adapter for webhook requests.
+- `src/app/webhook/processTelegramWebhookRequest.ts`:
+  webhook business flow (auth check, update parsing, command handling, ingest).
+- `src/handlers/dailySummaryCron.ts`:
+  thin tracked adapter for scheduled events.
+- `src/app/cron/runDailySummary.ts`:
+  cron business flow (chat scan, summary generation, delivery, reporting).
+- `src/app/summary/summarizeWindow.ts`:
+  shared "load messages + summarize window" pipeline reused by command and cron.
+- `src/telegram/replies.ts` and `src/telegram/texts.ts`:
+  reusable Telegram send helpers and user-facing text builders.
+- `src/observability/serviceTracking.ts` and `src/errors/appError.ts`:
+  tracked operation wrappers and typed application error codes.
+
+## Webhook Ack Policy
+
+- `2xx` means "update accepted" and Telegram should not retry this update.
+- non-`2xx` means "delivery failed" and Telegram may retry.
+- Current behavior:
+  - Returns `200` for successfully handled updates and intentionally ignored
+    updates (for example unknown commands).
+  - Returns `4xx` for method/auth/request-shape errors.
+  - Returns `5xx` for internal processing failures (for example DB/send errors).
+
 ## Rate Limiting
 
 - Scope:

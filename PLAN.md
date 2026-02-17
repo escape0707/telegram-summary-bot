@@ -127,13 +127,13 @@ ongoing cost and operational burden.
 
 - [x] docs: add refactor plan and commit boundaries (thin handlers + extracted
   application logic)
-- [ ] refactor: extract Telegram reply helpers and user-facing text builders to
+- [x] refactor: extract Telegram reply helpers and user-facing text builders to
   dedicated modules (no behavior change)
-- [ ] refactor: split webhook logic into application-level flow and keep
+- [x] refactor: split webhook logic into application-level flow and keep
   `handleTelegramWebhook` as a thin adapter
-- [ ] refactor: split daily cron logic into application-level flow and keep
+- [x] refactor: split daily cron logic into application-level flow and keep
   `handleDailySummaryCron` as a thin adapter
-- [ ] docs: document retry/ack policy and updated module responsibilities
+- [x] docs: document retry/ack policy and updated module responsibilities
 
 ## Implementation Notes
 
