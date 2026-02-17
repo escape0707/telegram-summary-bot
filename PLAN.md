@@ -138,7 +138,7 @@ ongoing cost and operational burden.
 ### Lint + Formatting Checklist
 
 - [x] docs: add lint+format rollout plan and commit boundaries
-- [ ] chore: add Prettier config/scripts/ignore (`format`, `format:check`)
+- [x] chore: add Prettier config/scripts/ignore (`format`, `format:check`)
 - [ ] style: apply Prettier formatting (mechanical-only commit)
 - [ ] chore: add ESLint + `typescript-eslint` + `eslint-config-prettier`
 - [ ] chore: fix initial ESLint findings (no behavior change)
