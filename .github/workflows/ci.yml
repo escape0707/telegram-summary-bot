@@ -25,5 +25,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Markdown lint
+        run: pnpm dlx markdownlint-cli2 "**/*.md" "#node_modules" "#.wrangler"
+
       - name: Typecheck
         run: pnpm exec tsc --noEmit --pretty false
