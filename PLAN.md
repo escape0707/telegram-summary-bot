@@ -123,6 +123,18 @@ ongoing cost and operational burden.
 - [x] feat: run cleanup from daily cron (best effort; log on failure)
 - [x] docs: document cleanup retention window and tuning knobs
 
+### Handler Refactor Checklist
+
+- [x] docs: add refactor plan and commit boundaries (thin handlers + extracted
+  application logic)
+- [ ] refactor: extract Telegram reply helpers and user-facing text builders to
+  dedicated modules (no behavior change)
+- [ ] refactor: split webhook logic into application-level flow and keep
+  `handleTelegramWebhook` as a thin adapter
+- [ ] refactor: split daily cron logic into application-level flow and keep
+  `handleDailySummaryCron` as a thin adapter
+- [ ] docs: document retry/ack policy and updated module responsibilities
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
