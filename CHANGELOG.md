@@ -19,3 +19,6 @@
 - D1-backed rate limiting for `/summary` and `/summaryday`:
   - Per-user-in-chat: 3 requests / 10 minutes.
   - Per-chat: 20 requests / 10 minutes.
+- Batched cleanup of stale `rate_limits` rows:
+  - Runs from daily cron as best effort.
+  - Configurable retention and batch limits in `src/config.ts`.

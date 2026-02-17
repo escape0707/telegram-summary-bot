@@ -121,7 +121,7 @@ ongoing cost and operational burden.
 - [x] docs: document rate limiting behavior and tuning
 - [x] feat: add stale `rate_limits` cleanup query (batched delete by `updated_at`)
 - [x] feat: run cleanup from daily cron (best effort; log on failure)
-- [ ] docs: document cleanup retention window and tuning knobs
+- [x] docs: document cleanup retention window and tuning knobs
 
 ## Implementation Notes
 

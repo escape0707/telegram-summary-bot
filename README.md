@@ -85,6 +85,11 @@ Optional:
 - Default limits:
   - Per-user-in-chat: 3 requests per 10 minutes.
   - Per-chat: 20 requests per 10 minutes.
+- Stale rate-limit rows are cleaned by daily cron in bounded batches.
+- Cleanup defaults:
+  - Retention: 3 days (`RATE_LIMIT_CLEANUP_RETENTION_SECONDS`).
+  - Batch size: 500 rows (`RATE_LIMIT_CLEANUP_BATCH_SIZE`).
+  - Max batches per cron run: 20 (`RATE_LIMIT_CLEANUP_MAX_BATCHES`).
 - Tuning values live in `src/config.ts`.
 
 ## Docs

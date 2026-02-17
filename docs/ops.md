@@ -75,6 +75,13 @@ then revert.
   - Per-user-in-chat: 3 requests / 10 minutes.
   - Per-chat: 20 requests / 10 minutes.
 - Storage: D1 `rate_limits` table, fixed-window counters.
+- Stale row cleanup:
+  - Runs in daily cron as best effort.
+  - Deletes stale rows in bounded batches to avoid long lock/write spikes.
+- Cleanup defaults:
+  - Retention: 3 days (`RATE_LIMIT_CLEANUP_RETENTION_SECONDS`).
+  - Batch size: 500 (`RATE_LIMIT_CLEANUP_BATCH_SIZE`).
+  - Max batches per run: 20 (`RATE_LIMIT_CLEANUP_MAX_BATCHES`).
 - Tuning: update values in `src/config.ts`, deploy, then monitor logs.
 
 ## Common Issues
@@ -93,6 +100,8 @@ then revert.
 5. `Rate limit exceeded` responses for summary commands:
    Expected behavior under load.
    Consider tuning rate limits in `src/config.ts` if limits are too strict.
+6. `Deleted stale rate limit rows` appears in cron logs:
+   Expected periodic cleanup behavior.
 
 ## Recovery
 
