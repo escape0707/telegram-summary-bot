@@ -153,7 +153,7 @@ ongoing cost and operational burden.
       `stylisticTypeChecked`
 - [x] chore: apply autofixable strict/stylistic findings
 - [x] chore: fix remaining strict findings manually (no behavior change)
-- [ ] docs: record strict preset choice and validation outcomes
+- [x] docs: record strict preset choice and validation outcomes
 
 ## Implementation Notes
 
@@ -171,7 +171,12 @@ ongoing cost and operational burden.
   `/summaryday`, `/status` so they show in the UI.
 - Code quality split:
   - Prettier owns formatting.
-  - ESLint (`typescript-eslint`) owns code-quality and bug-prone patterns.
+  - ESLint (`typescript-eslint`) runs strict type-checked and stylistic presets.
+  - Local overrides:
+    - `@typescript-eslint/consistent-type-definitions`: `off`
+    - `@typescript-eslint/array-type`: `off`
+    - `@typescript-eslint/restrict-template-expressions`: allow numbers and
+      booleans in template literals
   - `tsc --noEmit` owns type-checking correctness.
 
 ## Test / Validation Plan
