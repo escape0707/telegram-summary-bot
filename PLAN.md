@@ -151,7 +151,7 @@ ongoing cost and operational burden.
 - [x] docs: add strict lint rollout plan and commit boundaries
 - [x] chore: switch ESLint presets to `strictTypeChecked` +
       `stylisticTypeChecked`
-- [ ] chore: apply autofixable strict/stylistic findings
+- [x] chore: apply autofixable strict/stylistic findings
 - [ ] chore: fix remaining strict findings manually (no behavior change)
 - [ ] docs: record strict preset choice and validation outcomes
 
