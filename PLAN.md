@@ -164,17 +164,17 @@ ongoing cost and operational burden.
 ### Access Control & Onboarding Checklist
 
 - [x] docs: add auth/onboarding plan and commit boundaries
-- [ ] feat: add `TELEGRAM_ALLOWED_CHAT_IDS` env parsing helper
-- [ ] feat: enforce chat allowlist for webhook command handling, message ingest,
-  and daily cron dispatch
-- [ ] feat: reply with self-host guidance when blocked commands come from
-  non-allowlisted chats (include current `chat.id` in reply so setup does not
-  require log inspection)
+- [x] feat: add `TELEGRAM_ALLOWED_CHAT_IDS` env parsing helper
+- [x] feat: enforce chat allowlist for webhook command handling, message ingest,
+      and daily cron dispatch
+- [x] feat: reply with self-host guidance when blocked commands come from
+      non-allowlisted chats (include current `chat.id` in reply so setup does not
+      require log inspection)
 - [ ] feat: add `/help` and `/start` command responses with usage and project
-  link (`/help` available in allowed groups and DMs)
+      link (`/help` available in allowed groups and DMs)
 - [ ] chore: register `/help` and `/start` in Telegram setup script
 - [ ] docs: add explicit self-host/operator-responsibility disclaimer for repo
-  visitors and random bot DMs
+      visitors and random bot DMs
 - [ ] docs: update README + ops runbook for allowlist setup and user onboarding
 
 ## Implementation Notes
