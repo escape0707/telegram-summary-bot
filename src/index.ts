@@ -11,7 +11,7 @@ export default {
     }
 
     if (pathname === TELEGRAM_PATH) {
-      return handleTelegramWebhook(request, env);
+      return await handleTelegramWebhook(request, env);
     }
 
     return new Response("not found", { status: 404 });

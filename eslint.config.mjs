@@ -25,6 +25,8 @@ export default defineConfig(
     rules: {
       "@typescript-eslint/consistent-type-definitions": "off",
       "@typescript-eslint/array-type": "off",
+      "@typescript-eslint/return-await": ["error", "always"],
+      "@typescript-eslint/promise-function-async": "error",
       "@typescript-eslint/restrict-template-expressions": [
         "error",
         {
