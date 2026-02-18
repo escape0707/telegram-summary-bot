@@ -15,6 +15,18 @@ export function buildDailySummaryMessage(summary: string): string {
   return `${DAILY_SUMMARY_TITLE}\n\n${summary}`;
 }
 
+export function buildBlockedChatReplyText(
+  chatId: number,
+  projectRepoUrl: string,
+): string {
+  return [
+    "<b>This bot instance is restricted.</b>",
+    "This deployment only serves chats allowlisted by its operator.",
+    `Current chat ID: <code>${chatId}</code>`,
+    `To use this bot in your own group, deploy your own instance: ${projectRepoUrl}`,
+  ].join("\n");
+}
+
 export function buildSummaryRateLimitText(
   rateLimit: Exclude<SummaryRateLimitResult, { allowed: true }>,
 ): string {

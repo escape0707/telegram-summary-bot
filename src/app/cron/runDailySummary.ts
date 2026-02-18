@@ -2,9 +2,11 @@ import { loadActiveChatsForWindow } from "../../db/messages.js";
 import { cleanupStaleRateLimits } from "../../db/rateLimits.js";
 import type { Env } from "../../env.js";
 import { AppError, ErrorCode } from "../../errors/appError.js";
+import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
 import { summarizeWindow } from "../summary/summarizeWindow.js";
+import { isChatAllowed } from "../../telegram/allowlist.js";
 import type { SummaryCommand } from "../../telegram/commands.js";
-import { getBotToken, sendMessageToChat } from "../../telegram/send.js";
+import { sendMessageToChat } from "../../telegram/send.js";
 import { buildDailySummaryMessage } from "../../telegram/texts.js";
 
 const DAY_SECONDS = 24 * 60 * 60;
@@ -18,15 +20,9 @@ const DAILY_SUMMARY_COMMAND: SummaryCommand = {
 export async function runDailySummary(
   controller: ScheduledController,
   env: Env,
+  runtime: TelegramRuntime,
 ): Promise<void> {
-  const botToken = getBotToken(env);
-  if (!botToken) {
-    console.error("TELEGRAM_BOT_TOKEN is not configured");
-    throw new AppError(
-      ErrorCode.ConfigMissing,
-      "TELEGRAM_BOT_TOKEN is not configured",
-    );
-  }
+  const botToken = runtime.botToken;
 
   const windowEnd = Math.floor(controller.scheduledTime / 1_000);
   const windowStart = windowEnd - DAY_SECONDS;
@@ -59,10 +55,16 @@ export async function runDailySummary(
   let sentCount = 0;
   let skippedNoMessages = 0;
   let skippedNoText = 0;
+  let skippedNotAllowlisted = 0;
   let failedCount = 0;
   let firstFailureReason: string | undefined;
 
   for (const chat of chats) {
+    if (!isChatAllowed(chat.chatId, runtime.allowedChatIds)) {
+      skippedNotAllowlisted += 1;
+      continue;
+    }
+
     try {
       const summaryResult = await summarizeWindow(env, {
         chatId: chat.chatId,
@@ -129,6 +131,7 @@ export async function runDailySummary(
     sentCount,
     skippedNoMessages,
     skippedNoText,
+    skippedNotAllowlisted,
     failedCount,
     cleanupDeleted,
   });

@@ -16,3 +16,6 @@ export const SUMMARY_RATE_LIMIT_CHAT_LIMIT = 20;
 export const RATE_LIMIT_CLEANUP_RETENTION_SECONDS = 3 * 24 * 60 * 60;
 export const RATE_LIMIT_CLEANUP_BATCH_SIZE = 500;
 export const RATE_LIMIT_CLEANUP_MAX_BATCHES = 20;
+
+export const DEFAULT_PROJECT_REPO_URL =
+  "https://github.com/escape0707/telegram-summary-bot";

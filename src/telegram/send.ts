@@ -1,24 +1,14 @@
-import type { Env } from "../env.js";
 import { sendTelegramMessage } from "./api.js";
 import type { TelegramMessage } from "./types.js";
 
 type TelegramReplyTarget = Pick<TelegramMessage, "chat" | "message_id">;
-
-export function getBotToken(env: Env): string | undefined {
-  const token = env.TELEGRAM_BOT_TOKEN.trim();
-  if (!token) {
-    return undefined;
-  }
-
-  return token;
-}
 
 export async function sendReplyToMessage(
   botToken: string,
   message: TelegramReplyTarget,
   text: string,
 ): Promise<boolean> {
-  return sendTelegramMessage(
+  return await sendTelegramMessage(
     botToken,
     message.chat.id,
     text,
@@ -31,5 +21,5 @@ export async function sendMessageToChat(
   chatId: number,
   text: string,
 ): Promise<boolean> {
-  return sendTelegramMessage(botToken, chatId, text);
+  return await sendTelegramMessage(botToken, chatId, text);
 }

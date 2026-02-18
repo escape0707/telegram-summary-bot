@@ -3,18 +3,21 @@ import { insertMessage } from "../../db/messages.js";
 import { enforceSummaryRateLimit } from "../../db/rateLimits.js";
 import { loadServiceStatusSnapshot } from "../../db/serviceStats.js";
 import type { Env } from "../../env.js";
+import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
 import {
   summarizeWindow,
   type WindowSummaryResult,
 } from "../summary/summarizeWindow.js";
+import { isChatAllowed } from "../../telegram/allowlist.js";
 import {
   buildCommandParseErrorText,
   hasBotCommandAtStart,
   parseTelegramCommand,
   type SummaryCommand,
 } from "../../telegram/commands.js";
-import { getBotToken, sendReplyToMessage } from "../../telegram/send.js";
+import { sendReplyToMessage } from "../../telegram/send.js";
 import {
+  buildBlockedChatReplyText,
   buildStatusText,
   buildSummaryRateLimitText,
 } from "../../telegram/texts.js";
@@ -27,18 +30,11 @@ import {
 export async function processTelegramWebhookRequest(
   request: Request,
   env: Env,
+  runtime: TelegramRuntime,
+  webhookSecret: string,
 ): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response("method not allowed", { status: 405 });
-  }
-
-  const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET.trim();
-  if (!expectedSecret) {
-    return new Response("webhook secret not configured", { status: 500 });
-  }
-
   const providedSecret = request.headers.get(TELEGRAM_SECRET_HEADER);
-  if (providedSecret !== expectedSecret) {
+  if (providedSecret !== webhookSecret) {
     return new Response("unauthorized", { status: 401 });
   }
 
@@ -58,12 +54,18 @@ export async function processTelegramWebhookRequest(
     return new Response("ok", { status: 200 });
   }
 
+  const allowedChat = isChatAllowed(message.chat.id, runtime.allowedChatIds);
+
   if (hasBotCommandAtStart(message)) {
-    const response = await tryHandleCommand(env, message);
+    if (!allowedChat) {
+      return await sendBlockedChatReply(runtime, message);
+    }
+
+    const response = await tryHandleCommand(env, runtime.botToken, message);
     if (response) {
       return response;
     }
-  } else if (GROUP_CHAT_TYPES.includes(message.chat.type)) {
+  } else if (GROUP_CHAT_TYPES.includes(message.chat.type) && allowedChat) {
     try {
       await ingestMessage(env, message);
     } catch (error) {
@@ -71,6 +73,33 @@ export async function processTelegramWebhookRequest(
       return new Response("internal error", { status: 500 });
     }
   }
+
+  return new Response("ok", { status: 200 });
+}
+
+async function sendBlockedChatReply(
+  runtime: TelegramRuntime,
+  message: TelegramMessage & { text: string },
+): Promise<Response> {
+  const sent = await sendReplyToMessage(
+    runtime.botToken,
+    message,
+    buildBlockedChatReplyText(message.chat.id, runtime.projectRepoUrl),
+  );
+  if (!sent) {
+    console.error("Failed to send blocked chat reply", {
+      chatId: message.chat.id,
+      fromUserId: message.from?.id ?? null,
+    });
+    // Intentionally returns 200 to prevent webhook retries.
+    return new Response("ok", { status: 200 });
+  }
+
+  console.warn("Blocked command from non-allowlisted chat", {
+    chatId: message.chat.id,
+    chatType: message.chat.type,
+    fromUserId: message.from?.id ?? null,
+  });
 
   return new Response("ok", { status: 200 });
 }
@@ -99,6 +128,7 @@ async function ingestMessage(
 
 async function tryHandleCommand(
   env: Env,
+  botToken: string,
   message: TelegramMessage & { text: string },
 ): Promise<Response | undefined> {
   const commandResult = parseTelegramCommand(message.text);
@@ -109,7 +139,7 @@ async function tryHandleCommand(
     }
     console.warn("Invalid command format", commandResult.reason);
     const replyText = buildCommandParseErrorText(commandResult.reason);
-    return sendCommandReply(env, message, replyText);
+    return await sendCommandReply(botToken, message, replyText);
   }
 
   const command = commandResult.command;
@@ -120,16 +150,20 @@ async function tryHandleCommand(
         message,
         command,
       );
-      return sendCommandReply(env, message, replyText);
+      return await sendCommandReply(botToken, message, replyText);
     }
     case "status": {
       try {
         const status = await loadServiceStatusSnapshot(env);
         const replyText = buildStatusText(status, message.date);
-        return await sendCommandReply(env, message, replyText);
+        return await sendCommandReply(botToken, message, replyText);
       } catch (error) {
         console.error("Failed to load service status", error);
-        return sendCommandReply(env, message, "Failed to load status.");
+        return await sendCommandReply(
+          botToken,
+          message,
+          "Failed to load status.",
+        );
       }
     }
     default: {
@@ -195,15 +229,10 @@ async function resolveSummaryCommandReplyText(
 }
 
 async function sendCommandReply(
-  env: Env,
+  botToken: string,
   message: TelegramMessage & { text: string },
   replyText: string,
 ): Promise<Response> {
-  const botToken = getBotToken(env);
-  if (!botToken) {
-    console.error("TELEGRAM_BOT_TOKEN is not configured");
-    return new Response("internal error", { status: 500 });
-  }
   const sent = await sendReplyToMessage(botToken, message, replyText);
   if (!sent) {
     return new Response("internal error", { status: 502 });
