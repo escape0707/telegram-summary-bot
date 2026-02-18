@@ -152,7 +152,7 @@ ongoing cost and operational burden.
 - [x] chore: switch ESLint presets to `strictTypeChecked` +
       `stylisticTypeChecked`
 - [x] chore: apply autofixable strict/stylistic findings
-- [ ] chore: fix remaining strict findings manually (no behavior change)
+- [x] chore: fix remaining strict findings manually (no behavior change)
 - [ ] docs: record strict preset choice and validation outcomes
 
 ## Implementation Notes

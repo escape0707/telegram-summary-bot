@@ -79,7 +79,7 @@ async function incrementWindowCounter(
     return 0;
   }
 
-  const row = selected.results?.[0] as CounterRow | undefined;
+  const row = selected.results[0] as CounterRow | undefined;
   return row?.count ?? 0;
 }
 

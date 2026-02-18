@@ -75,7 +75,7 @@ export async function loadMessagesForSummary(
     .bind(chatId, windowStart, windowEnd)
     .all<StoredMessage>();
 
-  return result.results ?? [];
+  return result.results;
 }
 
 export async function loadActiveChatsForWindow(
@@ -92,7 +92,7 @@ export async function loadActiveChatsForWindow(
     .bind(windowStart, windowEnd)
     .all<ActiveChatRow>();
 
-  return (result.results ?? []).map((row) => ({
+  return result.results.map((row) => ({
     chatId: row.chat_id,
     chatUsername: row.chat_username,
   }));

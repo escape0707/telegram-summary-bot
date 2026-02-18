@@ -5,7 +5,7 @@ import type { TelegramMessage } from "./types.js";
 type TelegramReplyTarget = Pick<TelegramMessage, "chat" | "message_id">;
 
 export function getBotToken(env: Env): string | undefined {
-  const token = env.TELEGRAM_BOT_TOKEN?.trim();
+  const token = env.TELEGRAM_BOT_TOKEN.trim();
   if (!token) {
     return undefined;
   }

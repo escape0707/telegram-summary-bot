@@ -32,7 +32,7 @@ export async function processTelegramWebhookRequest(
     return new Response("method not allowed", { status: 405 });
   }
 
-  const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET.trim();
   if (!expectedSecret) {
     return new Response("webhook secret not configured", { status: 500 });
   }
@@ -49,7 +49,7 @@ export async function processTelegramWebhookRequest(
     return new Response("bad request", { status: 400 });
   }
 
-  if (!update || typeof update.update_id !== "number") {
+  if (typeof update.update_id !== "number") {
     return new Response("bad request", { status: 400 });
   }
 
@@ -126,7 +126,7 @@ async function tryHandleCommand(
       try {
         const status = await loadServiceStatusSnapshot(env);
         const replyText = buildStatusText(status, message.date);
-        return sendCommandReply(env, message, replyText);
+        return await sendCommandReply(env, message, replyText);
       } catch (error) {
         console.error("Failed to load service status", error);
         return sendCommandReply(env, message, "Failed to load status.");
