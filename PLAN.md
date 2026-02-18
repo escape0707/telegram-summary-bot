@@ -182,7 +182,7 @@ ongoing cost and operational burden.
 - [x] docs: add testing rollout plan and commit boundaries
 - [x] chore(test): add Vitest baseline (`vitest` + `test` / `test:run`
       scripts + minimal config)
-- [ ] test(unit): add parser tests for `parseTelegramCommand` and
+- [x] test(unit): add parser tests for `parseTelegramCommand` and
       `parseAllowedChatIds`
 - [ ] test(webhook): add command access matrix tests for DM-only `/help` and
       `/start`, plus allowlist behavior for `/summary` and `/status`
