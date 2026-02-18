@@ -189,7 +189,7 @@ ongoing cost and operational burden.
 - [x] test(rate-limit): add fixed-window counter tests for
       `enforceSummaryRateLimit`
 - [x] ci: run tests in GitHub Actions quality workflow
-- [ ] docs: add test commands and scope notes to README/CONTRIBUTING
+- [x] docs: add test commands and scope notes to README/CONTRIBUTING
 
 ## Implementation Notes
 

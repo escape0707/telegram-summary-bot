@@ -121,6 +121,11 @@ Optional:
 
 - `pnpm dev`: local worker with test-scheduled support.
 - `pnpm run deploy`: deploy worker.
+- `pnpm test`: Vitest watch mode.
+- `pnpm run test:run`: run Node-based unit tests (`*.test.ts`).
+- `pnpm run test:workers`: run Workers integration tests
+  (`*.worker.test.ts`).
+- `pnpm run test:coverage`: run unit tests with coverage report.
 - `pnpm run format`: format files with Prettier.
 - `pnpm run format:check`: check formatting in CI/local.
 - `pnpm run lint`: run ESLint.
@@ -128,6 +133,15 @@ Optional:
 - `pnpm run lint:md`: lint Markdown docs.
 - `pnpm cf-typegen`: regenerate Cloudflare types.
 - `pnpm run telegram:setup`: call Telegram `setWebhook` + `setMyCommands`.
+
+## Testing
+
+- Unit tests run in Node with `vitest.config.ts` and target `*.test.ts`.
+- Workers integration tests run in local `workerd`/Miniflare with
+  `vitest.workers.config.ts` and target `*.worker.test.ts`.
+- `src/db/rateLimits.worker.test.ts` intentionally uses
+  `prepare(...).run()`/`DELETE` setup instead of `DB.exec()` due
+  workers-sdk issue `#11999`.
 
 ## Rate Limiting
 

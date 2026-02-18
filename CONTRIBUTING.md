@@ -23,7 +23,14 @@ Thanks for your interest in contributing.
    pnpm run lint
    pnpm run lint:md
    pnpm exec tsc --noEmit --pretty false
+   pnpm run test:run
+   pnpm run test:workers
    ```
+
+4. Follow test scope conventions:
+   - Use `*.test.ts` for Node unit tests (`vitest.config.ts`).
+   - Use `*.worker.test.ts` for Workers runtime/integration tests
+     (`vitest.workers.config.ts`).
 
 ## Style Notes
 
