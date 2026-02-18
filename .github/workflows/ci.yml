@@ -36,3 +36,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm exec tsc --noEmit --pretty false
+
+      - name: Unit tests
+        run: pnpm run test:run
+
+      - name: Workers tests
+        run: pnpm run test:workers

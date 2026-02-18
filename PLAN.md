@@ -188,7 +188,7 @@ ongoing cost and operational burden.
       `/start`, plus allowlist behavior for `/summary` and `/status`
 - [x] test(rate-limit): add fixed-window counter tests for
       `enforceSummaryRateLimit`
-- [ ] ci: run tests in GitHub Actions quality workflow
+- [x] ci: run tests in GitHub Actions quality workflow
 - [ ] docs: add test commands and scope notes to README/CONTRIBUTING
 
 ## Implementation Notes
