@@ -180,7 +180,7 @@ ongoing cost and operational burden.
 ### Testing Rollout Checklist
 
 - [x] docs: add testing rollout plan and commit boundaries
-- [ ] chore(test): add Vitest baseline (`vitest` + `test` / `test:run`
+- [x] chore(test): add Vitest baseline (`vitest` + `test` / `test:run`
       scripts + minimal config)
 - [ ] test(unit): add parser tests for `parseTelegramCommand` and
       `parseAllowedChatIds`
