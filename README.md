@@ -13,6 +13,14 @@ on-demand and daily AI summaries.
 - Summary command rate limiting (per-user-in-chat and per-chat fixed windows).
 - GitHub Actions CI (typecheck) and manual CD workflow.
 
+## Self-Hosting Model
+
+- This project is designed for self-hosting, not as a shared public SaaS bot.
+- Each operator should deploy and manage their own Worker instance.
+- The operator is expected to understand basic Telegram Bot + Cloudflare Worker
+  operations and to actively participate in chats where the bot is installed.
+- This deployment can restrict usage with `TELEGRAM_ALLOWED_CHAT_IDS`.
+
 ## Stack
 
 - Cloudflare Workers
@@ -41,6 +49,8 @@ on-demand and daily AI summaries.
    ```bash
    TELEGRAM_BOT_TOKEN=...
    TELEGRAM_WEBHOOK_SECRET=...
+   TELEGRAM_ALLOWED_CHAT_IDS=-1001234567890
+   PROJECT_REPO_URL=https://github.com/escape0707/telegram-summary-bot
    ```
 
 3. Run local worker:
@@ -70,6 +80,22 @@ Optional:
 
 - `TELEGRAM_ALLOWED_UPDATES='message,edited_message'`
 - `TELEGRAM_DROP_PENDING_UPDATES='true'`
+
+## Allowlist and Onboarding
+
+- `TELEGRAM_ALLOWED_CHAT_IDS` controls which chat IDs can use this deployment.
+- Format: comma-separated numeric IDs, for example:
+  `-1001234567890,-1009876543210`.
+- Recommended production setup:
+
+  ```bash
+  wrangler secret put TELEGRAM_ALLOWED_CHAT_IDS
+  ```
+
+- Non-allowlisted chat commands receive a self-host guidance reply with the
+  current `chat.id`, so users can self-host their own instance without log
+  inspection.
+- `/help` and `/start` provide quick usage and onboarding guidance.
 
 ## Scripts
 

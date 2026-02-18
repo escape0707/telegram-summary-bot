@@ -13,6 +13,16 @@ This runbook covers setup, deploy, verification, and basic recovery for
 - Worker runtime:
   - `TELEGRAM_BOT_TOKEN`
   - `TELEGRAM_WEBHOOK_SECRET`
+  - `TELEGRAM_ALLOWED_CHAT_IDS`
+
+## Self-Host Responsibility
+
+- This bot is intended to be self-hosted per operator/team, not used as a
+  shared public endpoint.
+- The deployment owner is responsible for bot setup, allowlist management,
+  moderation expectations, and runtime cost/risk boundaries.
+- If a random user DMs `/start` or uses commands from a non-allowlisted chat,
+  the bot returns onboarding/self-host guidance instead of granting access.
 
 ## Deploy Workflow
 
@@ -33,6 +43,17 @@ This runbook covers setup, deploy, verification, and basic recovery for
    pnpm run telegram:setup
    ```
 
+3. Configure allowlisted chats for this deployment:
+
+   ```bash
+   wrangler secret put TELEGRAM_ALLOWED_CHAT_IDS
+   ```
+
+   - Value format: comma-separated numeric chat IDs
+     (example: `-1001234567890,-1009876543210`).
+   - Optional: set `PROJECT_REPO_URL` so onboarding replies point to your fork
+     or deployment docs.
+
 ## Verify After Deploy
 
 1. Health endpoint:
@@ -41,13 +62,12 @@ This runbook covers setup, deploy, verification, and basic recovery for
    curl -i https://<worker-domain>/health
    ```
 
-2. In Telegram group:
-   - Send regular messages.
-   - Run `/summary`.
-   - Run `/summaryday`.
-   - Run `/status`.
+2. In an allowlisted Telegram group, send regular messages and run `/summary`,
+   `/summaryday`, `/status`, and `/help`.
 
-3. Tail logs:
+3. In DM, run `/start` and confirm onboarding/self-host guidance is shown.
+
+4. Tail logs:
 
    ```bash
    pnpm wrangler tail --format pretty
