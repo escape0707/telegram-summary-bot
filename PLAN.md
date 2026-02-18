@@ -172,7 +172,7 @@ ongoing cost and operational burden.
       require log inspection)
 - [x] feat: add `/help` and `/start` command responses with usage and project
       link (`/help` available in allowed groups and DMs)
-- [ ] chore: register `/help` and `/start` in Telegram setup script
+- [x] chore: register `/help` and `/start` in Telegram setup script
 - [ ] docs: add explicit self-host/operator-responsibility disclaimer for repo
       visitors and random bot DMs
 - [ ] docs: update README + ops runbook for allowlist setup and user onboarding

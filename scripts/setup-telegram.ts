@@ -15,6 +15,8 @@ const BOT_COMMANDS: BotCommand[] = [
     description: "Summarize messages from the last 24h",
   },
   { command: "status", description: "Show service status and counters" },
+  { command: "help", description: "Show command help and project info" },
+  { command: "start", description: "Show onboarding and self-host guidance" },
 ];
 
 type TelegramApiResponse<T> = {
