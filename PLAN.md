@@ -177,6 +177,20 @@ ongoing cost and operational burden.
       visitors and random bot DMs
 - [x] docs: update README + ops runbook for allowlist setup and user onboarding
 
+### Testing Rollout Checklist
+
+- [x] docs: add testing rollout plan and commit boundaries
+- [ ] chore(test): add Vitest baseline (`vitest` + `test` / `test:run`
+      scripts + minimal config)
+- [ ] test(unit): add parser tests for `parseTelegramCommand` and
+      `parseAllowedChatIds`
+- [ ] test(webhook): add command access matrix tests for DM-only `/help` and
+      `/start`, plus allowlist behavior for `/summary` and `/status`
+- [ ] test(rate-limit): add fixed-window counter tests for
+      `enforceSummaryRateLimit`
+- [ ] ci: run tests in GitHub Actions quality workflow
+- [ ] docs: add test commands and scope notes to README/CONTRIBUTING
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
@@ -208,6 +222,11 @@ ongoing cost and operational burden.
 ## Test / Validation Plan
 
 - Local dev: wrangler dev and webhook test with curl or Telegram test updates.
+- Automated tests (planned):
+  - `pnpm test` for watch mode during development.
+  - `pnpm run test:run` for CI-style non-watch execution.
+  - Scope: parser logic, webhook command-access decisions, rate-limit counters.
+  - Out of initial scope: brittle exact-output assertions for AI summary text.
 - Manual tests:
   - Post messages in a group and verify D1 inserts.
   - /summary, /summary 3h and /summaryday produce a response.
