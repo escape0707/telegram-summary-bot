@@ -7,8 +7,14 @@ export type SummaryCommand = {
   toHours: number;
 };
 export type StatusCommand = { type: "status" };
+export type HelpCommand = { type: "help" };
+export type StartCommand = { type: "start" };
 
-export type ParsedCommand = SummaryCommand | StatusCommand;
+export type ParsedCommand =
+  | SummaryCommand
+  | StatusCommand
+  | HelpCommand
+  | StartCommand;
 
 export type CommandParseResult =
   | { ok: true; command: ParsedCommand }
@@ -109,6 +115,10 @@ export function parseTelegramCommand(text: string): CommandParseResult {
       };
     case "status":
       return { ok: true, command: { type: "status" } };
+    case "help":
+      return { ok: true, command: { type: "help" } };
+    case "start":
+      return { ok: true, command: { type: "start" } };
     default:
       return { ok: false, reason: "unknown command" };
   }

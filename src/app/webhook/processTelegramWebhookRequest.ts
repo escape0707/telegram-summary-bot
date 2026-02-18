@@ -13,11 +13,14 @@ import {
   buildCommandParseErrorText,
   hasBotCommandAtStart,
   parseTelegramCommand,
+  type ParsedCommand,
   type SummaryCommand,
 } from "../../telegram/commands.js";
 import { sendReplyToMessage } from "../../telegram/send.js";
 import {
   buildBlockedChatReplyText,
+  buildHelpCommandReplyText,
+  buildStartCommandReplyText,
   buildStatusText,
   buildSummaryRateLimitText,
 } from "../../telegram/texts.js";
@@ -55,13 +58,13 @@ export async function processTelegramWebhookRequest(
   }
 
   const allowedChat = isChatAllowed(message.chat.id, runtime.allowedChatIds);
+  const isPrivateChat = message.chat.type === "private";
 
   if (hasBotCommandAtStart(message)) {
-    if (!allowedChat) {
-      return await sendBlockedChatReply(runtime, message);
-    }
-
-    const response = await tryHandleCommand(env, runtime.botToken, message);
+    const response = await tryHandleCommand(env, runtime, message, {
+      allowedChat,
+      isPrivateChat,
+    });
     if (response) {
       return response;
     }
@@ -128,8 +131,9 @@ async function ingestMessage(
 
 async function tryHandleCommand(
   env: Env,
-  botToken: string,
+  runtime: TelegramRuntime,
   message: TelegramMessage & { text: string },
+  access: CommandAccessContext,
 ): Promise<Response | undefined> {
   const commandResult = parseTelegramCommand(message.text);
   if (!commandResult.ok) {
@@ -137,12 +141,19 @@ async function tryHandleCommand(
       // Returns silently for mistyped commands or other bots' commands.
       return undefined;
     }
+    if (!access.allowedChat) {
+      return await sendBlockedChatReply(runtime, message);
+    }
     console.warn("Invalid command format", commandResult.reason);
     const replyText = buildCommandParseErrorText(commandResult.reason);
-    return await sendCommandReply(botToken, message, replyText);
+    return await sendCommandReply(runtime.botToken, message, replyText);
   }
 
   const command = commandResult.command;
+  if (!isCommandAllowed(command, access)) {
+    return await sendBlockedChatReply(runtime, message);
+  }
+
   switch (command.type) {
     case "summary": {
       const replyText = await resolveSummaryCommandReplyText(
@@ -150,22 +161,53 @@ async function tryHandleCommand(
         message,
         command,
       );
-      return await sendCommandReply(botToken, message, replyText);
+      return await sendCommandReply(runtime.botToken, message, replyText);
     }
     case "status": {
       try {
         const status = await loadServiceStatusSnapshot(env);
         const replyText = buildStatusText(status, message.date);
-        return await sendCommandReply(botToken, message, replyText);
+        return await sendCommandReply(runtime.botToken, message, replyText);
       } catch (error) {
         console.error("Failed to load service status", error);
         return await sendCommandReply(
-          botToken,
+          runtime.botToken,
           message,
           "Failed to load status.",
         );
       }
     }
+    case "help": {
+      const replyText = buildHelpCommandReplyText(runtime.projectRepoUrl);
+      return await sendCommandReply(runtime.botToken, message, replyText);
+    }
+    case "start": {
+      const replyText = buildStartCommandReplyText(runtime.projectRepoUrl);
+      return await sendCommandReply(runtime.botToken, message, replyText);
+    }
+    default: {
+      const exhaustiveCheck: never = command;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+type CommandAccessContext = {
+  allowedChat: boolean;
+  isPrivateChat: boolean;
+};
+
+function isCommandAllowed(
+  command: ParsedCommand,
+  access: CommandAccessContext,
+): boolean {
+  switch (command.type) {
+    case "summary":
+    case "status":
+      return access.allowedChat;
+    case "help":
+    case "start":
+      return access.allowedChat || access.isPrivateChat;
     default: {
       const exhaustiveCheck: never = command;
       return exhaustiveCheck;

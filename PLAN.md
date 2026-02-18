@@ -170,7 +170,7 @@ ongoing cost and operational burden.
 - [x] feat: reply with self-host guidance when blocked commands come from
       non-allowlisted chats (include current `chat.id` in reply so setup does not
       require log inspection)
-- [ ] feat: add `/help` and `/start` command responses with usage and project
+- [x] feat: add `/help` and `/start` command responses with usage and project
       link (`/help` available in allowed groups and DMs)
 - [ ] chore: register `/help` and `/start` in Telegram setup script
 - [ ] docs: add explicit self-host/operator-responsibility disclaimer for repo

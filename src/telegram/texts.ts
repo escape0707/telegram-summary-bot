@@ -27,6 +27,28 @@ export function buildBlockedChatReplyText(
   ].join("\n");
 }
 
+export function buildHelpCommandReplyText(projectRepoUrl: string): string {
+  return [
+    "<b>Commands</b>",
+    "<code>/summary [Nh [Mh]]</code> - Summarize messages in a custom window.",
+    "<code>/summaryday</code> - Summarize messages from the last 24h.",
+    "<code>/status</code> - Show service health counters.",
+    "<code>/help</code> - Show command help and project info.",
+    "<code>/start</code> - Show onboarding and self-host guidance.",
+    `Project: ${projectRepoUrl}`,
+  ].join("\n");
+}
+
+export function buildStartCommandReplyText(projectRepoUrl: string): string {
+  return [
+    "<b>Welcome to Telegram Summary Bot</b>",
+    "This bot is self-hosted and operator-managed.",
+    "To use it in your own groups, deploy your own instance and allowlist your chat IDs.",
+    `Project: ${projectRepoUrl}`,
+    "Use /help to see the available commands.",
+  ].join("\n");
+}
+
 export function buildSummaryRateLimitText(
   rateLimit: Exclude<SummaryRateLimitResult, { allowed: true }>,
 ): string {
