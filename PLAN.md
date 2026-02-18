@@ -186,7 +186,7 @@ ongoing cost and operational burden.
       `parseAllowedChatIds`
 - [x] test(webhook): add command access matrix tests for DM-only `/help` and
       `/start`, plus allowlist behavior for `/summary` and `/status`
-- [ ] test(rate-limit): add fixed-window counter tests for
+- [x] test(rate-limit): add fixed-window counter tests for
       `enforceSummaryRateLimit`
 - [ ] ci: run tests in GitHub Actions quality workflow
 - [ ] docs: add test commands and scope notes to README/CONTRIBUTING
