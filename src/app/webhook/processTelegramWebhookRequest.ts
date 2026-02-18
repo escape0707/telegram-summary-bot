@@ -3,6 +3,10 @@ import { insertMessage } from "../../db/messages.js";
 import { enforceSummaryRateLimit } from "../../db/rateLimits.js";
 import { loadServiceStatusSnapshot } from "../../db/serviceStats.js";
 import type { Env } from "../../env.js";
+import {
+  resolveCommandAccess,
+  type CommandAccessContext,
+} from "./commandAccess.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
 import {
   summarizeWindow,
@@ -13,7 +17,6 @@ import {
   buildCommandParseErrorText,
   hasBotCommandAtStart,
   parseTelegramCommand,
-  type ParsedCommand,
   type SummaryCommand,
 } from "../../telegram/commands.js";
 import { sendReplyToMessage } from "../../telegram/send.js";
@@ -189,38 +192,6 @@ async function tryHandleCommand(
     case "start": {
       const replyText = buildStartCommandReplyText(runtime.projectRepoUrl);
       return await sendCommandReply(runtime.botToken, message, replyText);
-    }
-    default: {
-      const exhaustiveCheck: never = command;
-      return exhaustiveCheck;
-    }
-  }
-}
-
-type CommandAccessContext = {
-  allowedChat: boolean;
-  isPrivateChat: boolean;
-};
-
-type CommandAccessDecision =
-  | { allowed: true }
-  | { allowed: false; reason: "not_allowlisted" | "dm_only" };
-
-function resolveCommandAccess(
-  command: ParsedCommand,
-  access: CommandAccessContext,
-): CommandAccessDecision {
-  switch (command.type) {
-    case "summary":
-    case "status":
-      return access.allowedChat
-        ? { allowed: true }
-        : { allowed: false, reason: "not_allowlisted" };
-    case "help":
-    case "start": {
-      return access.isPrivateChat
-        ? { allowed: true }
-        : { allowed: false, reason: "dm_only" };
     }
     default: {
       const exhaustiveCheck: never = command;

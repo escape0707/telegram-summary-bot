@@ -184,7 +184,7 @@ ongoing cost and operational burden.
       scripts + minimal config)
 - [x] test(unit): add parser tests for `parseTelegramCommand` and
       `parseAllowedChatIds`
-- [ ] test(webhook): add command access matrix tests for DM-only `/help` and
+- [x] test(webhook): add command access matrix tests for DM-only `/help` and
       `/start`, plus allowlist behavior for `/summary` and `/status`
 - [ ] test(rate-limit): add fixed-window counter tests for
       `enforceSummaryRateLimit`
