@@ -31,7 +31,7 @@ This runbook covers setup, deploy, verification, and basic recovery for
 1. Deploy from local:
 
    ```bash
-   pnpm deploy
+   pnpm run deploy
    ```
 
    Or trigger manual deploy in GitHub Actions (`Deploy` workflow).

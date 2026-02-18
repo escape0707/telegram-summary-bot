@@ -13,6 +13,25 @@ on-demand and daily AI summaries.
 - Summary command rate limiting (per-user-in-chat and per-chat fixed windows).
 - GitHub Actions CI (typecheck) and manual CD workflow.
 
+## Architecture
+
+- Ingress: Telegram sends updates to Worker webhook (`/telegram`), which
+  validates secret headers, parses commands, and ingests group messages.
+- Storage: D1 stores raw messages, summaries, service stats, and rate-limit
+  counters.
+- Summarization: shared application pipeline loads windowed messages and calls
+  Workers AI for clustered summaries.
+- Scheduling: Cloudflare Cron triggers daily summary dispatch at 08:00 UTC.
+- Ops: tracked wrappers persist success/error state for `/status` and incident
+  debugging.
+
+## Tradeoffs
+
+- Strong simplicity and low cost over advanced configurability.
+- Self-host/operator model over shared multi-tenant service.
+- Fixed-window rate limiting over more complex token-bucket or adaptive models.
+- Prompt-driven formatting over deterministic template-only summarization.
+
 ## Self-Hosting Model
 
 - This project is designed for self-hosting, not as a shared public SaaS bot.
@@ -64,7 +83,7 @@ on-demand and daily AI summaries.
 1. Deploy worker:
 
    ```bash
-   pnpm deploy
+   pnpm run deploy
    ```
 
 2. Configure webhook and bot commands:
@@ -101,7 +120,7 @@ Optional:
 ## Scripts
 
 - `pnpm dev`: local worker with test-scheduled support.
-- `pnpm deploy`: deploy worker.
+- `pnpm run deploy`: deploy worker.
 - `pnpm run format`: format files with Prettier.
 - `pnpm run format:check`: check formatting in CI/local.
 - `pnpm run lint`: run ESLint.
