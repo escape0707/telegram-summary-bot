@@ -150,8 +150,13 @@ async function tryHandleCommand(
   }
 
   const command = commandResult.command;
-  if (!isCommandAllowed(command, access)) {
-    return await sendBlockedChatReply(runtime, message);
+  const accessDecision = resolveCommandAccess(command, access);
+  if (!accessDecision.allowed) {
+    if (accessDecision.reason === "not_allowlisted") {
+      return await sendBlockedChatReply(runtime, message);
+    }
+    // /help and /start are DM-only; ignore them in all group chats.
+    return undefined;
   }
 
   switch (command.type) {
@@ -197,17 +202,26 @@ type CommandAccessContext = {
   isPrivateChat: boolean;
 };
 
-function isCommandAllowed(
+type CommandAccessDecision =
+  | { allowed: true }
+  | { allowed: false; reason: "not_allowlisted" | "dm_only" };
+
+function resolveCommandAccess(
   command: ParsedCommand,
   access: CommandAccessContext,
-): boolean {
+): CommandAccessDecision {
   switch (command.type) {
     case "summary":
     case "status":
-      return access.allowedChat;
+      return access.allowedChat
+        ? { allowed: true }
+        : { allowed: false, reason: "not_allowlisted" };
     case "help":
-    case "start":
-      return access.allowedChat || access.isPrivateChat;
+    case "start": {
+      return access.isPrivateChat
+        ? { allowed: true }
+        : { allowed: false, reason: "dm_only" };
+    }
     default: {
       const exhaustiveCheck: never = command;
       return exhaustiveCheck;

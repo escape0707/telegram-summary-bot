@@ -21,8 +21,10 @@ This runbook covers setup, deploy, verification, and basic recovery for
   shared public endpoint.
 - The deployment owner is responsible for bot setup, allowlist management,
   moderation expectations, and runtime cost/risk boundaries.
-- If a random user DMs `/start` or uses commands from a non-allowlisted chat,
-  the bot returns onboarding/self-host guidance instead of granting access.
+- If a random user DMs `/start`, the bot returns onboarding/self-host guidance.
+- `/help` and `/start` are DM-only and ignored in group chats.
+- Non-allowlisted group usage of summary/status commands returns self-host
+  guidance instead of granting access.
 
 ## Deploy Workflow
 
@@ -63,7 +65,7 @@ This runbook covers setup, deploy, verification, and basic recovery for
    ```
 
 2. In an allowlisted Telegram group, send regular messages and run `/summary`,
-   `/summaryday`, `/status`, and `/help`.
+   `/summaryday`, and `/status`.
 
 3. In DM, run `/start` and confirm onboarding/self-host guidance is shown.
 

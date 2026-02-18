@@ -95,7 +95,8 @@ Optional:
 - Non-allowlisted chat commands receive a self-host guidance reply with the
   current `chat.id`, so users can self-host their own instance without log
   inspection.
-- `/help` and `/start` provide quick usage and onboarding guidance.
+- `/help` and `/start` provide onboarding guidance in DMs only.
+- In groups, `/help` and `/start` are intentionally ignored to reduce noise.
 
 ## Scripts
 
