@@ -16,7 +16,7 @@ export default {
 
     return new Response("not found", { status: 404 });
   },
-  async scheduled(controller, env, ctx) {
+  scheduled(controller, env, ctx) {
     ctx.waitUntil(handleDailySummaryCron(controller, env));
   },
 } satisfies ExportedHandler<Env>;

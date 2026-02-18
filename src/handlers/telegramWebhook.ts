@@ -2,7 +2,7 @@ import { processTelegramWebhookRequest } from "../app/webhook/processTelegramWeb
 import type { Env } from "../env.js";
 import { runTrackedResponse } from "../observability/serviceTracking.js";
 
-export async function handleTelegramWebhook(
+export function handleTelegramWebhook(
   request: Request,
   env: Env,
 ): Promise<Response> {

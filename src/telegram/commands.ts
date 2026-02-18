@@ -68,7 +68,7 @@ export function parseTelegramCommand(text: string): CommandParseResult {
 
   const command = commandName.toLowerCase();
   switch (command) {
-    case "summary":
+    case "summary": {
       const fromToken = tokens[0];
       const toToken = tokens[1];
 
@@ -101,6 +101,7 @@ export function parseTelegramCommand(text: string): CommandParseResult {
           toHours: normalizedToHours,
         },
       };
+    }
     case "summaryday":
       return {
         ok: true,

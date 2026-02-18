@@ -67,7 +67,7 @@ async function callTelegram<T>(
     body: JSON.stringify(body),
   });
 
-  const result = (await response.json()) as TelegramApiResponse<T>;
+  const result = await response.json<TelegramApiResponse<T>>();
   if (!response.ok || !result.ok) {
     const detail = result.description ?? `HTTP ${response.status}`;
     throw new Error(`${method} failed: ${detail}`);

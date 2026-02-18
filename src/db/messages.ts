@@ -75,7 +75,7 @@ export async function loadMessagesForSummary(
     .bind(chatId, windowStart, windowEnd)
     .all<StoredMessage>();
 
-  return (result.results ?? []) as StoredMessage[];
+  return result.results ?? [];
 }
 
 export async function loadActiveChatsForWindow(

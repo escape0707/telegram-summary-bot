@@ -91,7 +91,7 @@ export async function runDailySummary(
           default: {
             const exhaustiveCheck: never = summaryResult.reason;
             throw new Error(
-              `Unhandled summary result reason: ${exhaustiveCheck}`,
+              `Unhandled summary result reason: ${String(exhaustiveCheck)}`,
             );
           }
         }
