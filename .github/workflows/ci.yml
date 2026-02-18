@@ -28,5 +28,11 @@ jobs:
       - name: Markdown lint
         run: pnpm run lint:md
 
+      - name: Format check
+        run: pnpm run format:check
+
+      - name: ESLint
+        run: pnpm run lint
+
       - name: Typecheck
         run: pnpm exec tsc --noEmit --pretty false

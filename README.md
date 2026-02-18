@@ -75,6 +75,11 @@ Optional:
 
 - `pnpm dev`: local worker with test-scheduled support.
 - `pnpm deploy`: deploy worker.
+- `pnpm run format`: format files with Prettier.
+- `pnpm run format:check`: check formatting in CI/local.
+- `pnpm run lint`: run ESLint.
+- `pnpm run lint:fix`: run ESLint autofixes.
+- `pnpm run lint:md`: lint Markdown docs.
 - `pnpm cf-typegen`: regenerate Cloudflare types.
 - `pnpm run telegram:setup`: call Telegram `setWebhook` + `setMyCommands`.
 

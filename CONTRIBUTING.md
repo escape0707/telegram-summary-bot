@@ -16,9 +16,12 @@ Thanks for your interest in contributing.
    pnpm dev
    ```
 
-3. Run typecheck:
+3. Run quality checks:
 
    ```bash
+   pnpm run format:check
+   pnpm run lint
+   pnpm run lint:md
    pnpm exec tsc --noEmit --pretty false
    ```
 

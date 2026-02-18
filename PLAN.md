@@ -144,7 +144,7 @@ ongoing cost and operational burden.
 - [x] style: apply Prettier formatting (mechanical-only commit)
 - [x] chore: add ESLint + `typescript-eslint` + `eslint-config-prettier`
 - [x] chore: fix initial ESLint findings (no behavior change)
-- [ ] ci/docs: enforce `format:check` and lint in CI + contributor docs
+- [x] ci/docs: enforce `format:check` and lint in CI + contributor docs
 
 ## Implementation Notes
 
