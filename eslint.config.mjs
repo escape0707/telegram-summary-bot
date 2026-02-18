@@ -13,7 +13,8 @@ export default defineConfig(
     ],
   },
   eslint.configs.recommended,
-  tseslint.configs.recommendedTypeChecked,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
       parserOptions: {
@@ -21,9 +22,16 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    // `tsc` already enforces noUnusedLocals/noUnusedParameters.
     rules: {
-      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/consistent-type-definitions": "off",
+      "@typescript-eslint/array-type": "off",
+      "@typescript-eslint/restrict-template-expressions": [
+        "error",
+        {
+          allowNumber: true,
+          allowBoolean: true,
+        },
+      ],
     },
   },
   prettierConfig,

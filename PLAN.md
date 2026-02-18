@@ -146,6 +146,15 @@ ongoing cost and operational burden.
 - [x] chore: fix initial ESLint findings (no behavior change)
 - [x] ci/docs: enforce `format:check` and lint in CI + contributor docs
 
+### Strict Lint Rollout Checklist
+
+- [x] docs: add strict lint rollout plan and commit boundaries
+- [x] chore: switch ESLint presets to `strictTypeChecked` +
+      `stylisticTypeChecked`
+- [ ] chore: apply autofixable strict/stylistic findings
+- [ ] chore: fix remaining strict findings manually (no behavior change)
+- [ ] docs: record strict preset choice and validation outcomes
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
