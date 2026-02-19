@@ -120,10 +120,20 @@ describe("summaries db helpers", () => {
       ts: 4_000,
     });
 
-    const latest = await loadLatestSummaryForWindow(appEnv, -1001, 1_000, 4_600);
+    const latest = await loadLatestSummaryForWindow(
+      appEnv,
+      -1001,
+      1_000,
+      4_600,
+    );
     expect(latest?.summary_text).toBe("<b>latest</b>");
 
-    const missing = await loadLatestSummaryForWindow(appEnv, -1001, 9_999, 10_000);
+    const missing = await loadLatestSummaryForWindow(
+      appEnv,
+      -1001,
+      9_999,
+      10_000,
+    );
     expect(missing).toBeNull();
   });
 });
