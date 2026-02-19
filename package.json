@@ -15,6 +15,7 @@
     "lint:md": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.wrangler\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --pretty false",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "cf-typegen": "wrangler types"

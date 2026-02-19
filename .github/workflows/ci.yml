@@ -21,7 +21,7 @@ jobs:
           - name: ESLint
             command: pnpm run lint
           - name: Typecheck
-            command: pnpm exec tsc --noEmit --pretty false
+            command: pnpm run typecheck
           - name: Unit tests
             command: pnpm run test:run
           - name: Workers tests

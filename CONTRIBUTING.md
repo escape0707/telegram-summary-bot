@@ -22,7 +22,7 @@ Thanks for your interest in contributing.
    pnpm run format:check
    pnpm run lint
    pnpm run lint:md
-   pnpm exec tsc --noEmit --pretty false
+   pnpm run typecheck
    pnpm run test:run
    pnpm run test:workers
    ```
