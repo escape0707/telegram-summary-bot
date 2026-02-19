@@ -52,32 +52,51 @@ async function safeRecordServiceError(
   }
 }
 
+async function trackInBackground(
+  task: Promise<void>,
+  waitUntil?: ExecutionContext["waitUntil"],
+): Promise<void> {
+  if (waitUntil) {
+    waitUntil(task);
+    return;
+  }
+
+  await task;
+}
+
 export async function runTrackedResponse(
   env: Env,
   operation: string,
   run: () => Promise<Response>,
+  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<Response> {
   try {
     const response = await run();
     if (response.status >= INTERNAL_ERROR_STATUS) {
-      await safeRecordServiceError(
-        env,
-        operation,
-        ErrorCode.ResponseStatus,
-        `status=${response.status}`,
+      await trackInBackground(
+        safeRecordServiceError(
+          env,
+          operation,
+          ErrorCode.ResponseStatus,
+          `status=${response.status}`,
+        ),
+        waitUntil,
       );
     } else {
-      await safeMarkServiceOk(env);
+      await trackInBackground(safeMarkServiceOk(env), waitUntil);
     }
     return response;
   } catch (error) {
     const trackedError = getTrackedError(error);
     console.error(`${operation} failed`, { trackedError, error });
-    await safeRecordServiceError(
-      env,
-      operation,
-      trackedError.code,
-      trackedError.detail,
+    await trackInBackground(
+      safeRecordServiceError(
+        env,
+        operation,
+        trackedError.code,
+        trackedError.detail,
+      ),
+      waitUntil,
     );
     return new Response("internal error", { status: 500 });
   }
@@ -87,18 +106,22 @@ export async function runTrackedTask(
   env: Env,
   operation: string,
   run: () => Promise<void>,
+  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<void> {
   try {
     await run();
-    await safeMarkServiceOk(env);
+    await trackInBackground(safeMarkServiceOk(env), waitUntil);
   } catch (error) {
     const trackedError = getTrackedError(error);
     console.error(`${operation} failed`, { trackedError, error });
-    await safeRecordServiceError(
-      env,
-      operation,
-      trackedError.code,
-      trackedError.detail,
+    await trackInBackground(
+      safeRecordServiceError(
+        env,
+        operation,
+        trackedError.code,
+        trackedError.detail,
+      ),
+      waitUntil,
     );
   }
 }

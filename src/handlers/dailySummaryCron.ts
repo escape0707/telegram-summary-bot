@@ -6,9 +6,15 @@ import { runTrackedTask } from "../observability/serviceTracking.js";
 export async function handleDailySummaryCron(
   controller: ScheduledController,
   env: Env,
+  ctx: ExecutionContext,
 ): Promise<void> {
-  await runTrackedTask(env, "cron.daily_summary", async () => {
-    const runtime = requireTelegramRuntime(env);
-    await runDailySummary(controller, env, runtime);
-  });
+  await runTrackedTask(
+    env,
+    "cron.daily_summary",
+    async () => {
+      const runtime = requireTelegramRuntime(env);
+      await runDailySummary(controller, env, runtime, ctx.waitUntil.bind(ctx));
+    },
+    ctx.waitUntil.bind(ctx),
+  );
 }
