@@ -198,7 +198,7 @@ ongoing cost and operational burden.
       (write generated summaries + read history)
 - [x] feat(summary): persist successful generated summaries for on-demand and
       daily cron paths (history/audit/troubleshooting)
-- [ ] feat(status): keep `/status` summary counters sourced from persisted
+- [x] feat(status): keep `/status` summary counters sourced from persisted
       summaries and document semantics
 - [ ] feat(summary): optional idempotent retry optimization for exact same
       window requests (not a primary performance mechanism)

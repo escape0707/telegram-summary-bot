@@ -25,6 +25,13 @@ on-demand and daily AI summaries.
 - Ops: tracked wrappers persist success/error state for `/status` and incident
   debugging.
 
+## Summary Persistence
+
+- Successful summaries are persisted in D1 `summaries`.
+- `/status` reports `Stored summaries` as the count of persisted summary rows.
+- Persistence is history/audit/troubleshooting oriented. It is not currently a
+  general performance cache mechanism.
+
 ## Tradeoffs
 
 - Strong simplicity and low cost over advanced configurability.

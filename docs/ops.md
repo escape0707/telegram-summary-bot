@@ -102,6 +102,14 @@ then revert.
 - `src/observability/serviceTracking.ts` and `src/errors/appError.ts`:
   tracked operation wrappers and typed application error codes.
 
+## Summary Persistence Semantics
+
+- Successful summaries from on-demand and daily cron paths are persisted to D1
+  `summaries`.
+- `/status` `Stored summaries` reflects persisted summary rows in `summaries`.
+- This persistence is used for history/audit/troubleshooting and counters; it
+  is not currently used as a broad cache for cross-window summary reuse.
+
 ## Webhook Ack Policy
 
 - `2xx` means "update accepted" and Telegram should not retry this update.
