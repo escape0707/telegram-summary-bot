@@ -21,10 +21,10 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.13",
-    "@cloudflare/workers-types": "^4.20260218.0",
+    "@cloudflare/vitest-pool-workers": "^0.12.14",
+    "@cloudflare/workers-types": "^4.20260219.0",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.3.0",
     "@vitest/coverage-v8": "~3.2.4",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
@@ -34,7 +34,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.0",
     "vitest": "~3.2.4",
-    "wrangler": "^4.66.0"
+    "wrangler": "^4.67.0"
   },
   "packageManager": "pnpm@11.0.0-dev.1005+sha512.91f84a392eea348ea4852a182912d2520273a4336f933b78cc44bc931eb999923c097e9433a9b355adc1f725725ea99082fc9f032a559df832632e764c92c798"
 }
