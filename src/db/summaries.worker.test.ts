@@ -1,7 +1,11 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Env } from "../env.js";
-import { insertSummary, loadSummaryHistoryForChat } from "./summaries.js";
+import {
+  insertSummary,
+  loadLatestSummaryForWindow,
+  loadSummaryHistoryForChat,
+} from "./summaries.js";
 
 function testEnv(): Env {
   return {
@@ -89,5 +93,37 @@ describe("summaries db helpers", () => {
 
     const fallbackLimit = await loadSummaryHistoryForChat(appEnv, -1001, 0);
     expect(fallbackLimit).toHaveLength(1);
+  });
+
+  it("loads latest persisted summary for an exact window", async () => {
+    const appEnv = testEnv();
+
+    await insertSummary(appEnv, {
+      chatId: -1001,
+      windowStart: 1_000,
+      windowEnd: 4_600,
+      summaryText: "<b>first</b>",
+      ts: 2_000,
+    });
+    await insertSummary(appEnv, {
+      chatId: -1001,
+      windowStart: 1_000,
+      windowEnd: 4_600,
+      summaryText: "<b>latest</b>",
+      ts: 3_000,
+    });
+    await insertSummary(appEnv, {
+      chatId: -1001,
+      windowStart: 2_000,
+      windowEnd: 5_600,
+      summaryText: "<b>other-window</b>",
+      ts: 4_000,
+    });
+
+    const latest = await loadLatestSummaryForWindow(appEnv, -1001, 1_000, 4_600);
+    expect(latest?.summary_text).toBe("<b>latest</b>");
+
+    const missing = await loadLatestSummaryForWindow(appEnv, -1001, 9_999, 10_000);
+    expect(missing).toBeNull();
   });
 });

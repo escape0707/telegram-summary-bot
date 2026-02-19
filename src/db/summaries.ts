@@ -61,3 +61,22 @@ export async function loadSummaryHistoryForChat(
 
   return result.results;
 }
+
+export async function loadLatestSummaryForWindow(
+  env: Env,
+  chatId: number,
+  windowStart: number,
+  windowEnd: number,
+): Promise<StoredSummary | null> {
+  const row = await env.DB.prepare(
+    `SELECT id, chat_id, window_start, window_end, summary_text, ts
+     FROM summaries
+     WHERE chat_id = ? AND window_start = ? AND window_end = ?
+     ORDER BY ts DESC, id DESC
+     LIMIT 1`,
+  )
+    .bind(chatId, windowStart, windowEnd)
+    .first<StoredSummary>();
+
+  return row ?? null;
+}

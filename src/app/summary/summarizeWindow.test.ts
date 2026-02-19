@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateSummary } from "../../ai/summary.js";
 import { loadMessagesForSummary, type StoredMessage } from "../../db/messages.js";
-import { insertSummary } from "../../db/summaries.js";
+import {
+  insertSummary,
+  loadLatestSummaryForWindow,
+} from "../../db/summaries.js";
 import type { Env } from "../../env.js";
 import { summarizeWindow } from "./summarizeWindow.js";
 
@@ -15,6 +18,7 @@ vi.mock("../../ai/summary.js", () => ({
 
 vi.mock("../../db/summaries.js", () => ({
   insertSummary: vi.fn(),
+  loadLatestSummaryForWindow: vi.fn(),
 }));
 
 function makeEnv(): Env {
@@ -45,6 +49,32 @@ describe("summarizeWindow", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(insertSummary).mockResolvedValue();
+    vi.mocked(loadLatestSummaryForWindow).mockResolvedValue(null);
+  });
+
+  it("reuses persisted summary for exact-window retries", async () => {
+    const env = makeEnv();
+    vi.mocked(loadLatestSummaryForWindow).mockResolvedValue({
+      id: 1,
+      chat_id: -1001,
+      window_start: 10_000,
+      window_end: 13_600,
+      summary_text: "<b>cached</b>",
+      ts: 20_000,
+    });
+
+    const result = await summarizeWindow(env, {
+      chatId: -1001,
+      chatUsername: "group_a",
+      windowStart: 10_000,
+      windowEnd: 13_600,
+      command: { type: "summary", fromHours: 1, toHours: 0 },
+    });
+
+    expect(result).toEqual({ ok: true, summary: "<b>cached</b>" });
+    expect(loadMessagesForSummary).not.toHaveBeenCalled();
+    expect(generateSummary).not.toHaveBeenCalled();
+    expect(insertSummary).not.toHaveBeenCalled();
   });
 
   it("persists summary on successful generation", async () => {

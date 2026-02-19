@@ -1,6 +1,9 @@
 import { generateSummary } from "../../ai/summary.js";
 import { loadMessagesForSummary } from "../../db/messages.js";
-import { insertSummary } from "../../db/summaries.js";
+import {
+  insertSummary,
+  loadLatestSummaryForWindow,
+} from "../../db/summaries.js";
 import type { Env } from "../../env.js";
 import type { SummaryCommand } from "../../telegram/commands.js";
 
@@ -20,6 +23,16 @@ export async function summarizeWindow(
   env: Env,
   input: SummarizeWindowInput,
 ): Promise<WindowSummaryResult> {
+  const cachedSummary = await loadLatestSummaryForWindow(
+    env,
+    input.chatId,
+    input.windowStart,
+    input.windowEnd,
+  );
+  if (cachedSummary) {
+    return { ok: true, summary: cachedSummary.summary_text };
+  }
+
   const rows = await loadMessagesForSummary(
     env,
     input.chatId,
