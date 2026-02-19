@@ -8,7 +8,7 @@ on-demand and daily AI summaries.
 - Store non-command group messages in D1.
 - `/summary [Nh [Mh]]` for custom window summaries.
 - `/summaryday` alias for last 24h.
-- `/status` for service snapshot and counters.
+- `/status` for service snapshot and split real/synthetic summary metrics.
 - Daily cron summary dispatch (08:00 UTC / 17:00 JST).
 - Summary command rate limiting (per-user-in-chat and per-chat fixed windows).
 - GitHub Actions CI (typecheck) and manual CD workflow.
@@ -170,6 +170,15 @@ Optional:
 
 - Operational runbook: `docs/ops.md`
 - Project plan and progress: `PLAN.md`
+
+## Synthetic Benchmarks and Demo Safety
+
+- Keep benchmark runs separate from production usage metrics by recording them as
+  `synthetic_benchmark` telemetry.
+- Use only synthetic/anonymized message datasets for benchmark and demo
+  material.
+- For operator workflow and privacy checklist, see
+  `docs/ops.md` ("Synthetic Benchmark Workflow" and "Privacy-Safe Demo Capture").
 
 ## License
 

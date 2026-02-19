@@ -110,6 +110,18 @@ then revert.
 - This persistence is used for history/audit/troubleshooting and counters; it
   is not currently used as a broad cache for cross-window summary reuse.
 
+## Degraded Mode Semantics
+
+- Summary generation enters temporary degraded mode when recent `ai_error`
+  failures exceed the configured threshold.
+- Defaults in `src/config.ts`:
+  - `SUMMARY_AI_DEGRADED_WINDOW_SECONDS=900` (15 minutes)
+  - `SUMMARY_AI_DEGRADED_FAILURE_THRESHOLD=5`
+- During degraded mode:
+  - `/summary` and `/summaryday` return a temporary-unavailable message.
+  - Daily cron skips summary sending for affected windows/chats.
+- Recovery is automatic once recent `ai_error` counts fall below threshold.
+
 ## Webhook Ack Policy
 
 - `2xx` means "update accepted" and Telegram should not retry this update.
@@ -140,6 +152,29 @@ then revert.
   - Max batches per run: 20 (`RATE_LIMIT_CLEANUP_MAX_BATCHES`).
 - Tuning: update values in `src/config.ts`, deploy, then monitor logs.
 
+## Synthetic Benchmark Workflow
+
+1. Use a staging deployment or isolated local environment; do not benchmark in
+   production chats.
+2. Prepare synthetic/anonymized inputs only.
+3. Run your benchmark harness so summary telemetry writes use
+   `source = synthetic_benchmark` in `summary_runs`.
+4. Verify `/status`:
+   - `Real usage` remains production-only.
+   - `Synthetic benchmark` reflects benchmark runs.
+5. If benchmark rows should be removed after analysis, delete only
+   `source='synthetic_benchmark'` rows from `summary_runs`.
+
+Note: This repo does not currently include a dedicated synthetic benchmark CLI.
+Use your own controlled harness/script and keep source labeling explicit.
+
+## Privacy-Safe Demo Capture
+
+- Demo from synthetic/anonymized datasets only.
+- Show summary output and `/status` aggregates; avoid sharing raw message logs.
+- Redact or crop chat identifiers, usernames, and message links in screenshots.
+- Do not publish D1 exports containing user-generated content.
+
 ## Common Issues
 
 1. `401 unauthorized` on webhook:
@@ -158,6 +193,9 @@ then revert.
    Consider tuning rate limits in `src/config.ts` if limits are too strict.
 6. `Deleted stale rate limit rows` appears in cron logs:
    Expected periodic cleanup behavior.
+7. `Summary generation is temporarily unavailable due to recent AI failures`:
+   Degraded mode is active.
+   Check recent `ai_error` logs and wait for the rolling window to recover.
 
 ## Recovery
 

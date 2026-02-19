@@ -120,7 +120,7 @@ ongoing cost and operational burden.
 - [x] cd: add GitHub Actions deploy workflow (manual dispatch first)
 - [x] chore: automate Telegram webhook + bot command registration
 - [x] docs: add project docs + ops runbook
-- [ ] test: add unit test setup and first suites
+- [x] test: add unit test setup and first suites
 
 ### Rate Limiting Checklist
 
@@ -216,7 +216,7 @@ ongoing cost and operational burden.
       real-usage metrics and synthetic-benchmark aggregates
 - [x] feat(resilience): add temporary degraded mode guard when recent AI
       failures exceed threshold
-- [ ] docs: add operator guidance for synthetic benchmark generation and
+- [x] docs: add operator guidance for synthetic benchmark generation and
       privacy-safe demo capture
 
 ## Implementation Notes
