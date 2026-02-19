@@ -3,8 +3,12 @@ import { TELEGRAM_SECRET_HEADER } from "../../config.js";
 import type { Env } from "../../env.js";
 import { insertMessage } from "../../db/messages.js";
 import { enforceSummaryRateLimit } from "../../db/rateLimits.js";
+import {
+  SUMMARY_RUN_SOURCE_REAL_USAGE,
+  SUMMARY_RUN_TYPE_ON_DEMAND,
+} from "../../db/summaryRuns.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
-import { summarizeWindow } from "../summary/summarizeWindow.js";
+import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
 import { sendReplyToMessage } from "../../telegram/send.js";
 import type {
   TelegramChatType,
@@ -21,7 +25,7 @@ vi.mock("../../db/rateLimits.js", () => ({
 }));
 
 vi.mock("../summary/summarizeWindow.js", () => ({
-  summarizeWindow: vi.fn(),
+  runTrackedSummarizeWindow: vi.fn(),
 }));
 
 vi.mock("../../telegram/send.js", () => ({
@@ -146,7 +150,7 @@ describe("processTelegramWebhookRequest", () => {
     vi.resetAllMocks();
     vi.mocked(sendReplyToMessage).mockResolvedValue(true);
     vi.mocked(enforceSummaryRateLimit).mockResolvedValue({ allowed: true });
-    vi.mocked(summarizeWindow).mockResolvedValue({
+    vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
       ok: true,
       summary: "<b>summary</b>",
     });
@@ -179,6 +183,7 @@ describe("processTelegramWebhookRequest", () => {
 
     const env = makeEnv();
     const runtime = makeRuntime(new Set<number>([chatId]));
+    const waitUntil = vi.fn<(promise: Promise<void>) => void>();
     const update = makeCommandUpdate(commandText, {
       chatId,
       chatType: "supergroup",
@@ -192,6 +197,7 @@ describe("processTelegramWebhookRequest", () => {
       env,
       runtime,
       WEBHOOK_SECRET,
+      waitUntil,
     );
 
     expect(response.status).toBe(200);
@@ -201,12 +207,17 @@ describe("processTelegramWebhookRequest", () => {
       fromUserId,
       nowSeconds,
     );
-    expect(summarizeWindow).toHaveBeenCalledWith(env, {
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledWith(env, {
       chatId,
       chatUsername,
       windowStart: nowSeconds - fromHours * 60 * 60,
       windowEnd: nowSeconds - toHours * 60 * 60,
       command: { type: "summary", fromHours, toHours },
+      summaryRunContext: {
+        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+        runType: SUMMARY_RUN_TYPE_ON_DEMAND,
+        waitUntil,
+      },
     });
     expect(sendReplyToMessage).toHaveBeenCalledWith(
       "bot-token",
@@ -232,7 +243,7 @@ describe("processTelegramWebhookRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(summarizeWindow).not.toHaveBeenCalled();
+    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
     expect(sendReplyToMessage).toHaveBeenCalledWith(
       "bot-token",
       update.message,
@@ -259,7 +270,7 @@ describe("processTelegramWebhookRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(summarizeWindow).not.toHaveBeenCalled();
+    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
     const replyText = vi.mocked(sendReplyToMessage).mock.calls[0]?.[2];
     expect(replyText).toContain("Usage: /summary");
   });
@@ -289,7 +300,7 @@ describe("processTelegramWebhookRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(summarizeWindow).not.toHaveBeenCalled();
+    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
     const replyText = vi.mocked(sendReplyToMessage).mock.calls[0]?.[2];
     expect(replyText).toContain("Rate limit exceeded for this chat.");
     expect(replyText).toContain("Try again in 2m.");
@@ -312,7 +323,7 @@ describe("processTelegramWebhookRequest", () => {
 
     expect(response.status).toBe(200);
     expect(sendReplyToMessage).not.toHaveBeenCalled();
-    expect(summarizeWindow).not.toHaveBeenCalled();
+    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
     expect(insertMessage).not.toHaveBeenCalled();
   });
 
@@ -356,7 +367,7 @@ describe("processTelegramWebhookRequest", () => {
 
     expect(response.status).toBe(200);
     expect(sendReplyToMessage).not.toHaveBeenCalled();
-    expect(summarizeWindow).not.toHaveBeenCalled();
+    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
     expect(insertMessage).not.toHaveBeenCalled();
   });
 

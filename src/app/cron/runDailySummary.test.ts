@@ -1,10 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { loadActiveChatsForWindow } from "../../db/messages.js";
 import { cleanupStaleRateLimits } from "../../db/rateLimits.js";
+import {
+  SUMMARY_RUN_SOURCE_REAL_USAGE,
+  SUMMARY_RUN_TYPE_DAILY_CRON,
+} from "../../db/summaryRuns.js";
 import type { Env } from "../../env.js";
 import { AppError, ErrorCode } from "../../errors/appError.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
-import { summarizeWindow } from "../summary/summarizeWindow.js";
+import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
 import { sendMessageToChat } from "../../telegram/send.js";
 import { runDailySummary } from "./runDailySummary.js";
 
@@ -17,7 +21,7 @@ vi.mock("../../db/rateLimits.js", () => ({
 }));
 
 vi.mock("../summary/summarizeWindow.js", () => ({
-  summarizeWindow: vi.fn(),
+  runTrackedSummarizeWindow: vi.fn(),
 }));
 
 vi.mock("../../telegram/send.js", () => ({
@@ -57,7 +61,7 @@ describe("runDailySummary", () => {
     vi.resetAllMocks();
     vi.mocked(cleanupStaleRateLimits).mockResolvedValue(0);
     vi.mocked(loadActiveChatsForWindow).mockResolvedValue([]);
-    vi.mocked(summarizeWindow).mockResolvedValue({
+    vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
       ok: true,
       summary: "<b>summary</b>",
     });
@@ -76,9 +80,10 @@ describe("runDailySummary", () => {
     const env = makeEnv();
     const runtime = makeRuntime(new Set<number>([-1001]));
     const controller = makeController(scheduledTimeMs);
+    const waitUntil = vi.fn<(promise: Promise<void>) => void>();
 
     await expect(
-      runDailySummary(controller, env, runtime),
+      runDailySummary(controller, env, runtime, waitUntil),
     ).resolves.toBeUndefined();
 
     expect(cleanupStaleRateLimits).toHaveBeenCalledWith(env, nowSeconds);
@@ -87,12 +92,17 @@ describe("runDailySummary", () => {
       windowStart,
       nowSeconds,
     );
-    expect(summarizeWindow).toHaveBeenCalledWith(env, {
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledWith(env, {
       chatId: -1001,
       chatUsername: "group_a",
       windowStart,
       windowEnd: nowSeconds,
       command: { type: "summary", fromHours: 24, toHours: 0 },
+      summaryRunContext: {
+        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+        runType: SUMMARY_RUN_TYPE_DAILY_CRON,
+        waitUntil,
+      },
     });
     expect(sendMessageToChat).toHaveBeenCalledWith(
       "bot-token",
@@ -124,13 +134,17 @@ describe("runDailySummary", () => {
       windowStart,
       nowSeconds,
     );
-    expect(summarizeWindow).toHaveBeenCalledTimes(1);
-    expect(summarizeWindow).toHaveBeenCalledWith(env, {
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledTimes(1);
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledWith(env, {
       chatId: -1001,
       chatUsername: "group_a",
       windowStart,
       windowEnd: nowSeconds,
       command: { type: "summary", fromHours: 24, toHours: 0 },
+      summaryRunContext: {
+        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+        runType: SUMMARY_RUN_TYPE_DAILY_CRON,
+      },
     });
     expect(sendMessageToChat).toHaveBeenCalledTimes(1);
     expect(sendMessageToChat).toHaveBeenCalledWith(
@@ -149,7 +163,7 @@ describe("runDailySummary", () => {
       { chatId: -1002, chatUsername: "group_b" },
     ]);
 
-    vi.mocked(summarizeWindow)
+    vi.mocked(runTrackedSummarizeWindow)
       .mockResolvedValueOnce({ ok: true, summary: "<b>a</b>" })
       .mockResolvedValueOnce({ ok: true, summary: "<b>b</b>" });
     vi.mocked(sendMessageToChat)
@@ -175,7 +189,7 @@ describe("runDailySummary", () => {
       );
     }
 
-    expect(summarizeWindow).toHaveBeenCalledTimes(2);
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledTimes(2);
     expect(sendMessageToChat).toHaveBeenCalledTimes(2);
   });
 
@@ -204,7 +218,7 @@ describe("runDailySummary", () => {
       windowStart,
       nowSeconds,
     );
-    expect(summarizeWindow).toHaveBeenCalledTimes(1);
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledTimes(1);
     expect(sendMessageToChat).toHaveBeenCalledTimes(1);
   });
 });

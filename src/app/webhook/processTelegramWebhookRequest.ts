@@ -2,6 +2,10 @@ import { TELEGRAM_SECRET_HEADER } from "../../config.js";
 import { insertMessage } from "../../db/messages.js";
 import { enforceSummaryRateLimit } from "../../db/rateLimits.js";
 import { loadServiceStatusSnapshot } from "../../db/serviceStats.js";
+import {
+  SUMMARY_RUN_SOURCE_REAL_USAGE,
+  SUMMARY_RUN_TYPE_ON_DEMAND,
+} from "../../db/summaryRuns.js";
 import type { Env } from "../../env.js";
 import {
   resolveCommandAccess,
@@ -9,7 +13,7 @@ import {
 } from "./commandAccess.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
 import {
-  summarizeWindow,
+  runTrackedSummarizeWindow,
   type WindowSummaryResult,
 } from "../summary/summarizeWindow.js";
 import { isChatAllowed } from "../../telegram/allowlist.js";
@@ -38,6 +42,7 @@ export async function processTelegramWebhookRequest(
   env: Env,
   runtime: TelegramRuntime,
   webhookSecret: string,
+  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<Response> {
   const providedSecret = request.headers.get(TELEGRAM_SECRET_HEADER);
   if (providedSecret !== webhookSecret) {
@@ -64,10 +69,16 @@ export async function processTelegramWebhookRequest(
   const isPrivateChat = message.chat.type === "private";
 
   if (hasBotCommandAtStart(message)) {
-    const response = await tryHandleCommand(env, runtime, message, {
-      allowedChat,
-      isPrivateChat,
-    });
+    const response = await tryHandleCommand(
+      env,
+      runtime,
+      message,
+      {
+        allowedChat,
+        isPrivateChat,
+      },
+      waitUntil,
+    );
     if (response) {
       return response;
     }
@@ -137,6 +148,7 @@ async function tryHandleCommand(
   runtime: TelegramRuntime,
   message: TelegramMessage & { text: string },
   access: CommandAccessContext,
+  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<Response | undefined> {
   const commandResult = parseTelegramCommand(message.text);
   if (!commandResult.ok) {
@@ -168,6 +180,7 @@ async function tryHandleCommand(
         env,
         message,
         command,
+        waitUntil,
       );
       return await sendCommandReply(runtime.botToken, message, replyText);
     }
@@ -204,6 +217,7 @@ async function resolveSummaryCommandReplyText(
   env: Env,
   message: TelegramMessage & { text: string },
   command: SummaryCommand,
+  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<string> {
   try {
     const rateLimit = await enforceSummaryRateLimit(
@@ -225,12 +239,17 @@ async function resolveSummaryCommandReplyText(
 
   let summaryResult: WindowSummaryResult;
   try {
-    summaryResult = await summarizeWindow(env, {
+    summaryResult = await runTrackedSummarizeWindow(env, {
       chatId: message.chat.id,
       chatUsername: message.chat.username,
       windowStart,
       windowEnd,
       command,
+      summaryRunContext: {
+        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+        runType: SUMMARY_RUN_TYPE_ON_DEMAND,
+        ...(waitUntil ? { waitUntil } : {}),
+      },
     });
   } catch (error) {
     console.error("Failed to load messages for summary", error);

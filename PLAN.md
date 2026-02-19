@@ -210,7 +210,7 @@ ongoing cost and operational burden.
 - [x] feat(db): add summary run telemetry table and data-access helpers
       (real/synthetic source, window metadata, input/output sizing, model,
       latency, success/failure, error type, timestamp)
-- [ ] feat(metrics): record telemetry for every summary attempt
+- [x] feat(metrics): record telemetry for every summary attempt
       (on-demand and daily cron paths)
 - [ ] feat(status): extend `/status` snapshot with clearly separated
       real-usage metrics and synthetic-benchmark aggregates

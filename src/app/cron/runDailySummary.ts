@@ -1,9 +1,13 @@
 import { loadActiveChatsForWindow } from "../../db/messages.js";
 import { cleanupStaleRateLimits } from "../../db/rateLimits.js";
+import {
+  SUMMARY_RUN_SOURCE_REAL_USAGE,
+  SUMMARY_RUN_TYPE_DAILY_CRON,
+} from "../../db/summaryRuns.js";
 import type { Env } from "../../env.js";
 import { AppError, ErrorCode } from "../../errors/appError.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
-import { summarizeWindow } from "../summary/summarizeWindow.js";
+import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
 import { isChatAllowed } from "../../telegram/allowlist.js";
 import type { SummaryCommand } from "../../telegram/commands.js";
 import { sendMessageToChat } from "../../telegram/send.js";
@@ -21,6 +25,7 @@ export async function runDailySummary(
   controller: ScheduledController,
   env: Env,
   runtime: TelegramRuntime,
+  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<void> {
   const botToken = runtime.botToken;
 
@@ -66,12 +71,17 @@ export async function runDailySummary(
     }
 
     try {
-      const summaryResult = await summarizeWindow(env, {
+      const summaryResult = await runTrackedSummarizeWindow(env, {
         chatId: chat.chatId,
         chatUsername: chat.chatUsername ?? undefined,
         windowStart,
         windowEnd,
         command: DAILY_SUMMARY_COMMAND,
+        summaryRunContext: {
+          source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+          runType: SUMMARY_RUN_TYPE_DAILY_CRON,
+          ...(waitUntil ? { waitUntil } : {}),
+        },
       });
 
       if (!summaryResult.ok) {
