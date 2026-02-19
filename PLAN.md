@@ -214,7 +214,7 @@ ongoing cost and operational burden.
       (on-demand and daily cron paths)
 - [x] feat(status): extend `/status` snapshot with clearly separated
       real-usage metrics and synthetic-benchmark aggregates
-- [ ] feat(resilience): add temporary degraded mode guard when recent AI
+- [x] feat(resilience): add temporary degraded mode guard when recent AI
       failures exceed threshold
 - [ ] docs: add operator guidance for synthetic benchmark generation and
       privacy-safe demo capture

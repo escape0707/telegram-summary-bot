@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SUMMARY_MODEL } from "../../config.js";
+import {
+  SUMMARY_AI_DEGRADED_FAILURE_THRESHOLD,
+  SUMMARY_MODEL,
+} from "../../config.js";
 import { generateSummary } from "../../ai/summary.js";
 import {
   loadMessagesForSummary,
   type StoredMessage,
 } from "../../db/messages.js";
 import {
+  countRecentAiFailedSummaryRuns,
   insertSummaryRun,
   SUMMARY_RUN_SOURCE_REAL_USAGE,
   SUMMARY_RUN_TYPE_ON_DEMAND,
@@ -31,6 +35,7 @@ vi.mock("../../db/summaries.js", () => ({
 }));
 
 vi.mock("../../db/summaryRuns.js", () => ({
+  countRecentAiFailedSummaryRuns: vi.fn(),
   insertSummaryRun: vi.fn(),
   SUMMARY_RUN_SOURCE_REAL_USAGE: "real_usage",
   SUMMARY_RUN_TYPE_ON_DEMAND: "on_demand",
@@ -63,6 +68,7 @@ function makeStoredMessage(
 describe("runTrackedSummarizeWindow", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(countRecentAiFailedSummaryRuns).mockResolvedValue(0);
     vi.mocked(insertSummary).mockResolvedValue();
     vi.mocked(insertSummaryRun).mockResolvedValue();
     vi.mocked(loadLatestSummaryForWindow).mockResolvedValue(null);
@@ -197,6 +203,37 @@ describe("runTrackedSummarizeWindow", () => {
 
     expect(result).toEqual({ ok: false, reason: "no_text" });
     expect(insertSummary).not.toHaveBeenCalled();
+  });
+
+  it("returns degraded when recent AI failures exceed threshold", async () => {
+    const env = makeEnv();
+    vi.mocked(loadMessagesForSummary).mockResolvedValue([makeStoredMessage()]);
+    vi.mocked(countRecentAiFailedSummaryRuns).mockResolvedValue(
+      SUMMARY_AI_DEGRADED_FAILURE_THRESHOLD,
+    );
+
+    const result = await runTrackedSummarizeWindow(env, {
+      chatId: -1001,
+      chatUsername: "group_a",
+      windowStart: 10_000,
+      windowEnd: 13_600,
+      command: { type: "summary", fromHours: 1, toHours: 0 },
+      summaryRunContext: {
+        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+        runType: SUMMARY_RUN_TYPE_ON_DEMAND,
+      },
+    });
+
+    expect(result).toEqual({ ok: false, reason: "degraded" });
+    expect(generateSummary).not.toHaveBeenCalled();
+    expect(insertSummary).not.toHaveBeenCalled();
+    expect(insertSummaryRun).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        success: false,
+        errorType: "degraded",
+      }),
+    );
   });
 
   it("returns summary even if persistence write fails", async () => {

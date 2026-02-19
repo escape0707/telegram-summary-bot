@@ -351,6 +351,34 @@ describe("processTelegramWebhookRequest", () => {
     expect(replyText).toContain("Try again in 2m.");
   });
 
+  it("replies with degraded message when summary backend is temporarily degraded", async () => {
+    vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
+      ok: false,
+      reason: "degraded",
+    });
+
+    const env = makeEnv();
+    const runtime = makeRuntime(new Set<number>([-1001]));
+    const update = makeCommandUpdate("/summary", {
+      chatId: -1001,
+      chatType: "supergroup",
+      date: 10_000,
+    });
+
+    const response = await processTelegramWebhookRequest(
+      makeRequest(update),
+      env,
+      runtime,
+      WEBHOOK_SECRET,
+    );
+
+    expect(response.status).toBe(200);
+    const replyText = vi.mocked(sendReplyToMessage).mock.calls[0]?.[2];
+    expect(replyText).toContain(
+      "Summary generation is temporarily unavailable due to recent AI failures.",
+    );
+  });
+
   it("ignores unknown commands without replying", async () => {
     const env = makeEnv();
     const runtime = makeRuntime(new Set<number>([-1001]));

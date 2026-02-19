@@ -221,4 +221,28 @@ describe("runDailySummary", () => {
     expect(runTrackedSummarizeWindow).toHaveBeenCalledTimes(1);
     expect(sendMessageToChat).toHaveBeenCalledTimes(1);
   });
+
+  it("skips sending when degraded mode is active", async () => {
+    const nowSeconds = 2_000_000;
+    const scheduledTimeMs = nowSeconds * 1_000;
+
+    vi.mocked(loadActiveChatsForWindow).mockResolvedValue([
+      { chatId: -1001, chatUsername: "group_a" },
+    ]);
+    vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
+      ok: false,
+      reason: "degraded",
+    });
+
+    const env = makeEnv();
+    const runtime = makeRuntime(new Set<number>([-1001]));
+    const controller = makeController(scheduledTimeMs);
+
+    await expect(
+      runDailySummary(controller, env, runtime),
+    ).resolves.toBeUndefined();
+
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledTimes(1);
+    expect(sendMessageToChat).not.toHaveBeenCalled();
+  });
 });

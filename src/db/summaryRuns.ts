@@ -148,6 +148,39 @@ export async function countRecentFailedSummaryRuns(
   return result?.count ?? 0;
 }
 
+export async function countRecentAiFailedSummaryRuns(
+  env: Env,
+  sinceTs: number,
+  source?: SummaryRunSource,
+): Promise<number> {
+  if (source) {
+    const result = await env.DB.prepare(
+      `SELECT COUNT(*) AS count
+       FROM summary_runs
+       WHERE success = 0
+         AND error_type = 'ai_error'
+         AND ts >= ?
+         AND source = ?`,
+    )
+      .bind(sinceTs, source)
+      .first<CountRow>();
+
+    return result?.count ?? 0;
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT COUNT(*) AS count
+     FROM summary_runs
+     WHERE success = 0
+       AND error_type = 'ai_error'
+       AND ts >= ?`,
+  )
+    .bind(sinceTs)
+    .first<CountRow>();
+
+  return result?.count ?? 0;
+}
+
 export async function loadSummaryRunStats(
   env: Env,
   source: SummaryRunSource,

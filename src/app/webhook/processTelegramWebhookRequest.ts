@@ -27,6 +27,7 @@ import { sendReplyToMessage } from "../../telegram/send.js";
 import {
   buildBlockedChatReplyText,
   buildHelpCommandReplyText,
+  buildSummaryDegradedText,
   buildStartCommandReplyText,
   buildStatusText,
   buildSummaryRateLimitText,
@@ -267,6 +268,8 @@ async function resolveSummaryCommandReplyText(
       return "No text messages found in that window.";
     case "ai_error":
       return "Failed to generate summary (check logs).";
+    case "degraded":
+      return buildSummaryDegradedText();
     default: {
       const exhaustiveCheck: never = summaryResult.reason;
       return exhaustiveCheck;

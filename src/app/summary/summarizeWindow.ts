@@ -1,10 +1,15 @@
 import { generateSummary } from "../../ai/summary.js";
-import { SUMMARY_MODEL } from "../../config.js";
+import {
+  SUMMARY_AI_DEGRADED_FAILURE_THRESHOLD,
+  SUMMARY_AI_DEGRADED_WINDOW_SECONDS,
+  SUMMARY_MODEL,
+} from "../../config.js";
 import {
   loadMessagesForSummary,
   type StoredMessage,
 } from "../../db/messages.js";
 import {
+  countRecentAiFailedSummaryRuns,
   insertSummaryRun,
   type SummaryRunSource,
   type SummaryRunType,
@@ -19,7 +24,7 @@ import type { SummaryCommand } from "../../telegram/commands.js";
 
 export type WindowSummaryResult =
   | { ok: true; summary: string }
-  | { ok: false; reason: "no_messages" | "no_text" | "ai_error" };
+  | { ok: false; reason: "no_messages" | "no_text" | "ai_error" | "degraded" };
 
 type SummarizeWindowInput = {
   chatId: number;
@@ -207,6 +212,36 @@ async function summarizeFromRows(
   return { ok: false, reason: "ai_error" };
 }
 
+async function shouldApplyDegradedMode(
+  env: Env,
+  input: SummarizeWindowInput,
+): Promise<boolean> {
+  const source = input.summaryRunContext?.source;
+  const sinceTs =
+    Math.floor(Date.now() / 1_000) - SUMMARY_AI_DEGRADED_WINDOW_SECONDS;
+
+  try {
+    const aiFailureCount = await countRecentAiFailedSummaryRuns(
+      env,
+      sinceTs,
+      source,
+    );
+    const degraded = aiFailureCount >= SUMMARY_AI_DEGRADED_FAILURE_THRESHOLD;
+    if (degraded) {
+      console.warn("Summary AI degraded mode active", {
+        source: source ?? "all",
+        sinceTs,
+        aiFailureCount,
+      });
+    }
+    return degraded;
+  } catch (error) {
+    // Fail-open: if telemetry lookup fails, proceed with normal summary flow.
+    console.error("Failed to evaluate summary degraded mode", { error });
+    return false;
+  }
+}
+
 export async function runTrackedSummarizeWindow(
   env: Env,
   input: SummarizeWindowInput,
@@ -229,6 +264,11 @@ export async function runTrackedSummarizeWindow(
 
     if (prepared.rows.length === 0) {
       result = { ok: false, reason: "no_messages" };
+      return result;
+    }
+
+    if (await shouldApplyDegradedMode(env, input)) {
+      result = { ok: false, reason: "degraded" };
       return result;
     }
 

@@ -77,6 +77,13 @@ export function buildSummaryRateLimitText(
   ].join(" ");
 }
 
+export function buildSummaryDegradedText(): string {
+  return [
+    "Summary generation is temporarily unavailable due to recent AI failures.",
+    "Please try again in a few minutes.",
+  ].join(" ");
+}
+
 export function buildStatusText(
   status: StatusTextSnapshot,
   nowSeconds: number,

@@ -60,6 +60,7 @@ export async function runDailySummary(
   let sentCount = 0;
   let skippedNoMessages = 0;
   let skippedNoText = 0;
+  let skippedDegraded = 0;
   let skippedNotAllowlisted = 0;
   let failedCount = 0;
   let firstFailureReason: string | undefined;
@@ -91,6 +92,9 @@ export async function runDailySummary(
             break;
           case "no_text":
             skippedNoText += 1;
+            break;
+          case "degraded":
+            skippedDegraded += 1;
             break;
           case "ai_error":
             failedCount += 1;
@@ -141,6 +145,7 @@ export async function runDailySummary(
     sentCount,
     skippedNoMessages,
     skippedNoText,
+    skippedDegraded,
     skippedNotAllowlisted,
     failedCount,
     cleanupDeleted,

@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Env } from "../env.js";
 import {
+  countRecentAiFailedSummaryRuns,
   countRecentFailedSummaryRuns,
   insertSummaryRun,
   loadSummaryRunStats,
@@ -216,5 +217,49 @@ describe("summary run telemetry", () => {
 
     const failuresSince1500 = await countRecentFailedSummaryRuns(appEnv, 1_500);
     expect(failuresSince1500).toBe(1);
+  });
+
+  it("counts recent AI failures only", async () => {
+    const appEnv = testEnv();
+
+    await insertSummaryRun(
+      appEnv,
+      makeRun({
+        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+        success: false,
+        errorType: "ai_error",
+        ts: 1_000,
+      }),
+    );
+
+    await insertSummaryRun(
+      appEnv,
+      makeRun({
+        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+        success: false,
+        errorType: "no_messages",
+        ts: 1_100,
+      }),
+    );
+
+    await insertSummaryRun(
+      appEnv,
+      makeRun({
+        source: SUMMARY_RUN_SOURCE_SYNTHETIC_BENCHMARK,
+        success: false,
+        errorType: "ai_error",
+        ts: 1_200,
+      }),
+    );
+
+    const realUsageFailures = await countRecentAiFailedSummaryRuns(
+      appEnv,
+      0,
+      SUMMARY_RUN_SOURCE_REAL_USAGE,
+    );
+    expect(realUsageFailures).toBe(1);
+
+    const allSourceFailures = await countRecentAiFailedSummaryRuns(appEnv, 0);
+    expect(allSourceFailures).toBe(2);
   });
 });
