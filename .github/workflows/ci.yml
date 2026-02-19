@@ -8,7 +8,24 @@ on:
 
 jobs:
   quality:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Markdown lint
+            command: pnpm run lint:md
+          - name: Format check
+            command: pnpm run format:check
+          - name: ESLint
+            command: pnpm run lint
+          - name: Typecheck
+            command: pnpm exec tsc --noEmit --pretty false
+          - name: Unit tests
+            command: pnpm run test:run
+          - name: Workers tests
+            command: pnpm run test:workers
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -25,20 +42,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Markdown lint
-        run: pnpm run lint:md
-
-      - name: Format check
-        run: pnpm run format:check
-
-      - name: ESLint
-        run: pnpm run lint
-
-      - name: Typecheck
-        run: pnpm exec tsc --noEmit --pretty false
-
-      - name: Unit tests
-        run: pnpm run test:run
-
-      - name: Workers tests
-        run: pnpm run test:workers
+      - name: Run check
+        run: ${{ matrix.command }}
