@@ -1,8 +1,8 @@
-## Status Metrics Design Notes
+# Status Metrics Design Notes
 
 Implement `/status` with clear metric provenance and operational value.
 
-### 1) Separate metric categories
+## 1) Separate metric categories
 
 - `real_usage`: traffic from normal bot operation.
 - `synthetic_benchmark`: controlled benchmark and simulation runs.
@@ -14,7 +14,7 @@ Recommended `/status` layout:
 
 This avoids mixing production behavior with benchmark output.
 
-### 2) Record the minimum useful telemetry
+## 2) Record the minimum useful telemetry
 
 For each summarize call, log:
 
@@ -30,7 +30,7 @@ For each summarize call, log:
 
 This is enough to analyze throughput, latency distribution, failures, and cost trends.
 
-### 3) Add a resilience mechanism
+## 3) Add a resilience mechanism
 
 Recommended mechanism: temporary degraded mode for AI backend failures.
 
@@ -38,7 +38,7 @@ Recommended mechanism: temporary degraded mode for AI backend failures.
 - Return a degraded response explaining temporary unavailability.
 - Record degraded-mode transitions in telemetry.
 
-### 4) Keep demonstrations privacy-safe
+## 4) Keep demonstrations privacy-safe
 
 - Use synthetic chat logs for benchmarks and demos.
 - Show only summary output and `/status` aggregates.

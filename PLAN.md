@@ -206,7 +206,7 @@ ongoing cost and operational burden.
 
 ### Metrics & Reliability Checklist
 
-- [ ] docs: add metrics/reliability rollout plan and commit boundaries
+- [x] docs: add metrics/reliability rollout plan and commit boundaries
 - [ ] feat(db): add summary run telemetry table and data-access helpers
       (real/synthetic source, window metadata, input/output sizing, model,
       latency, success/failure, error type, timestamp)
