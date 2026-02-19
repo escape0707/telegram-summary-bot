@@ -146,6 +146,8 @@ Optional:
 - Unit tests run in Node with `vitest.config.ts` and target `*.test.ts`.
 - Workers integration tests run in local `workerd`/Miniflare with
   `vitest.workers.config.ts` and target `*.worker.test.ts`.
+- In restricted sandbox environments, `pnpm run test:workers` may require
+  elevated permissions because `workerd` starts isolated runtimes.
 - `src/db/rateLimits.worker.test.ts` intentionally uses
   `prepare(...).run()`/`DELETE` setup instead of `DB.exec()` due
   workers-sdk issue `#11999`.

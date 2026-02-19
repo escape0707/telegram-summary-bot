@@ -27,6 +27,9 @@ Thanks for your interest in contributing.
    pnpm run test:workers
    ```
 
+   Note: In restricted sandbox environments, `pnpm run test:workers` may need
+   elevated permissions because `workerd` starts isolated runtimes.
+
 4. Follow test scope conventions:
    - Use `*.test.ts` for Node unit tests (`vitest.config.ts`).
    - Use `*.worker.test.ts` for Workers runtime/integration tests
