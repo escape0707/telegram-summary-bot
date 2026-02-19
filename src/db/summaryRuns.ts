@@ -35,6 +35,8 @@ export type SummaryRunInsert = {
 export type SummaryRunStats = {
   source: SummaryRunSource;
   sinceTs: number;
+  firstRunTs: number | null;
+  lastRunTs: number | null;
   runCount: number;
   successCount: number;
   failureCount: number;
@@ -48,6 +50,8 @@ export type SummaryRunStats = {
 
 type SummaryRunAggregateRow = {
   run_count: number;
+  first_run_ts: number | null;
+  last_run_ts: number | null;
   success_count: number | null;
   failure_count: number | null;
   total_input_message_count: number | null;
@@ -152,6 +156,8 @@ export async function loadSummaryRunStats(
   const aggregate = await env.DB.prepare(
     `SELECT
       COUNT(*) AS run_count,
+      MIN(ts) AS first_run_ts,
+      MAX(ts) AS last_run_ts,
       SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) AS success_count,
       SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS failure_count,
       SUM(input_message_count) AS total_input_message_count,
@@ -178,6 +184,8 @@ export async function loadSummaryRunStats(
   return {
     source,
     sinceTs,
+    firstRunTs: aggregate?.first_run_ts ?? null,
+    lastRunTs: aggregate?.last_run_ts ?? null,
     runCount: aggregate?.run_count ?? 0,
     successCount: aggregate?.success_count ?? 0,
     failureCount: aggregate?.failure_count ?? 0,

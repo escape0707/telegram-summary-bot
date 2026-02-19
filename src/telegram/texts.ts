@@ -2,6 +2,19 @@ import type { SummaryRateLimitResult } from "../db/rateLimits.js";
 
 const DAILY_SUMMARY_TITLE = "<b>Daily Summary (Auto, last 24h)</b>";
 
+export type StatusSummaryRunTextSnapshot = {
+  sinceTs: number | null;
+  runCount: number;
+  successCount: number;
+  failureCount: number;
+  totalInputMessageCount: number;
+  totalInputChars: number;
+  totalOutputChars: number;
+  avgLatencyMs: number | null;
+  p50LatencyMs: number | null;
+  p95LatencyMs: number | null;
+};
+
 export type StatusTextSnapshot = {
   uptimeStart: number;
   lastOkTs: number | null;
@@ -9,6 +22,8 @@ export type StatusTextSnapshot = {
   lastError: string | null;
   messageCount: number;
   summaryCount: number;
+  realUsage: StatusSummaryRunTextSnapshot;
+  syntheticBenchmark: StatusSummaryRunTextSnapshot;
 };
 
 export function buildDailySummaryMessage(summary: string): string {
@@ -78,6 +93,15 @@ export function buildStatusText(
     ? escapeHtml(status.lastError)
     : "none";
 
+  const realUsageSection = buildSummaryRunSection(
+    "Real usage",
+    status.realUsage,
+  );
+  const syntheticBenchmarkSection = buildSummaryRunSection(
+    "Synthetic benchmark",
+    status.syntheticBenchmark,
+  );
+
   return [
     "<b>Status</b>",
     `Uptime: ${uptimeText}`,
@@ -86,7 +110,26 @@ export function buildStatusText(
     `Last error: ${lastErrorText}`,
     `Stored messages: ${status.messageCount}`,
     `Stored summaries: ${status.summaryCount}`,
+    "",
+    ...realUsageSection,
+    "",
+    ...syntheticBenchmarkSection,
   ].join("\n");
+}
+
+function buildSummaryRunSection(
+  sectionTitle: string,
+  metrics: StatusSummaryRunTextSnapshot,
+): string[] {
+  return [
+    `<b>${sectionTitle}</b>`,
+    `Since: ${formatDate(metrics.sinceTs)}`,
+    `Runs: ${metrics.runCount} (ok ${metrics.successCount}, failed ${metrics.failureCount})`,
+    `Input messages: ${metrics.totalInputMessageCount}`,
+    `Input chars: ${metrics.totalInputChars}`,
+    `Output chars: ${metrics.totalOutputChars}`,
+    `Latency ms (avg/p50/p95): ${formatNullableNumber(metrics.avgLatencyMs)}/${formatNullableNumber(metrics.p50LatencyMs)}/${formatNullableNumber(metrics.p95LatencyMs)}`,
+  ];
 }
 
 function formatRetryAfter(seconds: number): string {
@@ -108,6 +151,18 @@ function formatTimestamp(timestamp: number | null): string {
   }
 
   return new Date(timestamp * 1_000).toISOString();
+}
+
+function formatDate(timestamp: number | null): string {
+  if (timestamp === null) {
+    return "n/a";
+  }
+
+  return new Date(timestamp * 1_000).toISOString().slice(0, 10);
+}
+
+function formatNullableNumber(value: number | null): string {
+  return value == null ? "n/a" : String(value);
 }
 
 function escapeHtml(value: string): string {

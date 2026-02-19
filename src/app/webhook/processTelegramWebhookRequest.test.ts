@@ -3,6 +3,7 @@ import { TELEGRAM_SECRET_HEADER } from "../../config.js";
 import type { Env } from "../../env.js";
 import { insertMessage } from "../../db/messages.js";
 import { enforceSummaryRateLimit } from "../../db/rateLimits.js";
+import { loadServiceStatusSnapshot } from "../../db/serviceStats.js";
 import {
   SUMMARY_RUN_SOURCE_REAL_USAGE,
   SUMMARY_RUN_TYPE_ON_DEMAND,
@@ -22,6 +23,10 @@ vi.mock("../../db/messages.js", () => ({
 
 vi.mock("../../db/rateLimits.js", () => ({
   enforceSummaryRateLimit: vi.fn(),
+}));
+
+vi.mock("../../db/serviceStats.js", () => ({
+  loadServiceStatusSnapshot: vi.fn(),
 }));
 
 vi.mock("../summary/summarizeWindow.js", () => ({
@@ -66,6 +71,43 @@ function makeRuntime(allowedChatIds: ReadonlySet<number>): TelegramRuntime {
     botToken: "bot-token",
     allowedChatIds,
     projectRepoUrl: PROJECT_REPO_URL,
+  };
+}
+
+function makeStatusSnapshot(): Awaited<
+  ReturnType<typeof loadServiceStatusSnapshot>
+> {
+  return {
+    uptimeStart: 1_000,
+    lastOkTs: 2_000,
+    errorCount: 1,
+    lastError: "none",
+    messageCount: 5,
+    summaryCount: 2,
+    realUsage: {
+      sinceTs: 900,
+      runCount: 3,
+      successCount: 2,
+      failureCount: 1,
+      totalInputMessageCount: 50,
+      totalInputChars: 2_200,
+      totalOutputChars: 600,
+      avgLatencyMs: 300,
+      p50LatencyMs: 280,
+      p95LatencyMs: 420,
+    },
+    syntheticBenchmark: {
+      sinceTs: null,
+      runCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      totalInputMessageCount: 0,
+      totalInputChars: 0,
+      totalOutputChars: 0,
+      avgLatencyMs: null,
+      p50LatencyMs: null,
+      p95LatencyMs: null,
+    },
   };
 }
 
@@ -150,6 +192,9 @@ describe("processTelegramWebhookRequest", () => {
     vi.resetAllMocks();
     vi.mocked(sendReplyToMessage).mockResolvedValue(true);
     vi.mocked(enforceSummaryRateLimit).mockResolvedValue({ allowed: true });
+    vi.mocked(loadServiceStatusSnapshot).mockResolvedValue(
+      makeStatusSnapshot(),
+    );
     vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
       ok: true,
       summary: "<b>summary</b>",
@@ -369,6 +414,29 @@ describe("processTelegramWebhookRequest", () => {
     expect(sendReplyToMessage).not.toHaveBeenCalled();
     expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
     expect(insertMessage).not.toHaveBeenCalled();
+  });
+
+  it("replies to /status with split real and synthetic telemetry", async () => {
+    const env = makeEnv();
+    const runtime = makeRuntime(new Set<number>([-1001]));
+    const update = makeCommandUpdate("/status", {
+      chatId: -1001,
+      chatType: "supergroup",
+      date: 2_500,
+    });
+
+    const response = await processTelegramWebhookRequest(
+      makeRequest(update),
+      env,
+      runtime,
+      WEBHOOK_SECRET,
+    );
+
+    expect(response.status).toBe(200);
+    expect(loadServiceStatusSnapshot).toHaveBeenCalledWith(env);
+    const replyText = vi.mocked(sendReplyToMessage).mock.calls[0]?.[2];
+    expect(replyText).toContain("<b>Real usage</b>");
+    expect(replyText).toContain("<b>Synthetic benchmark</b>");
   });
 
   it("ingests non-command messages from allowlisted group chats", async () => {

@@ -212,7 +212,7 @@ ongoing cost and operational burden.
       latency, success/failure, error type, timestamp)
 - [x] feat(metrics): record telemetry for every summary attempt
       (on-demand and daily cron paths)
-- [ ] feat(status): extend `/status` snapshot with clearly separated
+- [x] feat(status): extend `/status` snapshot with clearly separated
       real-usage metrics and synthetic-benchmark aggregates
 - [ ] feat(resilience): add temporary degraded mode guard when recent AI
       failures exceed threshold

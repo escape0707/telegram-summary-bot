@@ -149,6 +149,8 @@ describe("summary run telemetry", () => {
     expect(realUsageStats).toEqual({
       source: SUMMARY_RUN_SOURCE_REAL_USAGE,
       sinceTs: 0,
+      firstRunTs: 2_000,
+      lastRunTs: 2_010,
       runCount: 2,
       successCount: 1,
       failureCount: 1,
@@ -168,6 +170,8 @@ describe("summary run telemetry", () => {
     expect(syntheticStats).toEqual({
       source: SUMMARY_RUN_SOURCE_SYNTHETIC_BENCHMARK,
       sinceTs: 0,
+      firstRunTs: 2_020,
+      lastRunTs: 2_020,
       runCount: 1,
       successCount: 1,
       failureCount: 0,
