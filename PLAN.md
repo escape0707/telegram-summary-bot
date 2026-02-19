@@ -191,6 +191,21 @@ ongoing cost and operational burden.
 - [x] ci: run tests in GitHub Actions quality workflow
 - [x] docs: add test commands and scope notes to README/CONTRIBUTING
 
+### Metrics & Reliability Checklist
+
+- [ ] docs: add metrics/reliability rollout plan and commit boundaries
+- [ ] feat(db): add summary run telemetry table and data-access helpers
+      (real/synthetic source, window metadata, input/output sizing, model,
+      latency, success/failure, error type, timestamp)
+- [ ] feat(metrics): record telemetry for every summary attempt
+      (on-demand and daily cron paths)
+- [ ] feat(status): extend `/status` snapshot with clearly separated
+      real-usage metrics and synthetic-benchmark aggregates
+- [ ] feat(resilience): add temporary degraded mode guard when recent AI
+      failures exceed threshold
+- [ ] docs: add operator guidance for synthetic benchmark generation and
+      privacy-safe demo capture
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
