@@ -191,6 +191,19 @@ ongoing cost and operational burden.
 - [x] ci: run tests in GitHub Actions quality workflow
 - [x] docs: add test commands and scope notes to README/CONTRIBUTING
 
+### Summary Persistence Checklist
+
+- [x] docs: add summary persistence rollout plan and commit boundaries
+- [x] feat(db): add summaries data-access helpers for persistence and lookups
+      (write generated summaries + read history)
+- [ ] feat(summary): persist successful generated summaries for on-demand and
+      daily cron paths (history/audit/troubleshooting)
+- [ ] feat(status): keep `/status` summary counters sourced from persisted
+      summaries and document semantics
+- [ ] feat(summary): optional idempotent retry optimization for exact same
+      window requests (not a primary performance mechanism)
+- [ ] test: add/extend tests for summary persistence paths
+
 ### Metrics & Reliability Checklist
 
 - [ ] docs: add metrics/reliability rollout plan and commit boundaries
