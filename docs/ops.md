@@ -110,6 +110,14 @@ then revert.
 - This persistence is used for history/audit/troubleshooting and counters; it
   is not currently used as a broad cache for cross-window summary reuse.
 
+## Forwarded Message Attribution Semantics
+
+- Webhook ingest attributes regular messages to `message.from`.
+- For forwarded messages, attribution switches to the original sender only when
+  Telegram provides `forward_origin.type = user` with `sender_user`.
+- For all other forwarded-origin types (`hidden_user`, `chat`, `channel`) and
+  automatic forwards, attribution remains the forwarding user (`message.from`).
+
 ## Degraded Mode Semantics
 
 - Summary generation enters temporary degraded mode when recent `ai_error`

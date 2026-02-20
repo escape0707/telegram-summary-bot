@@ -45,6 +45,8 @@ type UpdateOptions = {
   fromUsername?: string;
   date?: number;
   messageId?: number;
+  forwardOrigin?: TelegramMessage["forward_origin"];
+  isAutomaticForward?: boolean;
 };
 
 type MessageUpdate = {
@@ -140,6 +142,12 @@ function makeUpdate(
         ? { username: options.chatUsername }
         : {}),
     },
+    ...(options.forwardOrigin
+      ? {
+          forward_origin: options.forwardOrigin,
+        }
+      : {}),
+    ...(options.isAutomaticForward ? { is_automatic_forward: true } : {}),
     ...(isCommand
       ? {
           entities: [
@@ -519,5 +527,89 @@ describe("processTelegramWebhookRequest", () => {
     expect(response.status).toBe(200);
     expect(insertMessage).not.toHaveBeenCalled();
     expect(sendReplyToMessage).not.toHaveBeenCalled();
+  });
+
+  it("attributes forwarded user-origin messages to original sender", async () => {
+    const env = makeEnv();
+    const runtime = makeRuntime(new Set<number>([-1001]));
+    const update = makeTextUpdate("fwd text", {
+      chatId: -1001,
+      chatType: "group",
+      chatUsername: "allowed_group",
+      messageId: 45,
+      date: 22_100,
+      fromUserId: 88,
+      fromUsername: "forwarder",
+      forwardOrigin: {
+        type: "user",
+        date: 22_000,
+        sender_user: {
+          id: 99,
+          username: "original_sender",
+        },
+      },
+    });
+
+    const response = await processTelegramWebhookRequest(
+      makeRequest(update),
+      env,
+      runtime,
+      WEBHOOK_SECRET,
+    );
+
+    expect(response.status).toBe(200);
+    expect(insertMessage).toHaveBeenCalledWith(env, {
+      chatId: -1001,
+      chatUsername: "allowed_group",
+      messageId: 45,
+      userId: 99,
+      username: "original_sender",
+      text: "fwd text",
+      ts: 22_100,
+      replyToMessageId: null,
+    });
+  });
+
+  it("keeps forwarder attribution for non-user forward origins", async () => {
+    const env = makeEnv();
+    const runtime = makeRuntime(new Set<number>([-1001]));
+    const update = makeTextUpdate("fwd channel post", {
+      chatId: -1001,
+      chatType: "group",
+      messageId: 46,
+      date: 22_200,
+      fromUserId: 88,
+      fromUsername: "forwarder",
+      isAutomaticForward: true,
+      forwardOrigin: {
+        type: "channel",
+        date: 22_050,
+        chat: {
+          id: -1002,
+          type: "channel",
+          username: "source_channel",
+        },
+        message_id: 777,
+      },
+    });
+
+    const response = await processTelegramWebhookRequest(
+      makeRequest(update),
+      env,
+      runtime,
+      WEBHOOK_SECRET,
+    );
+
+    expect(response.status).toBe(200);
+    expect(insertMessage).toHaveBeenCalledWith(env, {
+      chatId: -1001,
+      chatUsername: null,
+      messageId: 46,
+      userId: 88,
+      username: "forwarder",
+      text: "fwd channel post",
+      ts: 22_200,
+      replyToMessageId: null,
+    });
   });
 });

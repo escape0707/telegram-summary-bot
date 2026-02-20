@@ -32,6 +32,14 @@ on-demand and daily AI summaries.
 - Persistence is history/audit/troubleshooting oriented. It is not currently a
   general performance cache mechanism.
 
+## Forwarded Message Attribution
+
+- For regular messages, sender attribution comes from `message.from`.
+- For forwarded messages, sender attribution is overridden only when
+  `forward_origin.type` is `user` (using `forward_origin.sender_user`).
+- For all other forward-origin types (`hidden_user`, `chat`, `channel`) and
+  automatic forwards, attribution remains the forwarding user (`message.from`).
+
 ## Tradeoffs
 
 - Strong simplicity and low cost over advanced configurability.

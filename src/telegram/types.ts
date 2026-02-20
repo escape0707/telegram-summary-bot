@@ -36,6 +36,39 @@ export type TelegramMessageEntity = {
   length: number;
 };
 
+export type TelegramMessageOriginUser = {
+  type: "user";
+  date: number;
+  sender_user: TelegramUser;
+};
+
+export type TelegramMessageOriginHiddenUser = {
+  type: "hidden_user";
+  date: number;
+  sender_user_name: string;
+};
+
+export type TelegramMessageOriginChat = {
+  type: "chat";
+  date: number;
+  sender_chat: TelegramChat;
+  author_signature?: string;
+};
+
+export type TelegramMessageOriginChannel = {
+  type: "channel";
+  date: number;
+  chat: TelegramChat;
+  message_id: number;
+  author_signature?: string;
+};
+
+export type TelegramMessageOrigin =
+  | TelegramMessageOriginUser
+  | TelegramMessageOriginHiddenUser
+  | TelegramMessageOriginChat
+  | TelegramMessageOriginChannel;
+
 export type TelegramMessage = {
   message_id: number;
   date: number;
@@ -48,6 +81,8 @@ export type TelegramMessage = {
   reply_to_message?: {
     message_id: number;
   };
+  forward_origin?: TelegramMessageOrigin;
+  is_automatic_forward?: true;
 };
 
 export type TelegramUpdate = {

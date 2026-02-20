@@ -35,6 +35,7 @@ import {
 import {
   GROUP_CHAT_TYPES,
   type TelegramMessage,
+  type TelegramUser,
   type TelegramUpdate,
 } from "../../telegram/types.js";
 
@@ -128,8 +129,9 @@ async function ingestMessage(
 ): Promise<void> {
   const text = message.text ?? message.caption ?? null;
   const replyToMessageId = message.reply_to_message?.message_id ?? null;
-  const userId = message.from?.id ?? null;
-  const username = message.from?.username ?? null;
+  const attributedUser = resolveAttributedUser(message);
+  const userId = attributedUser?.id ?? null;
+  const username = attributedUser?.username ?? null;
   const chatUsername = message.chat.username ?? null;
 
   await insertMessage(env, {
@@ -142,6 +144,17 @@ async function ingestMessage(
     ts: message.date,
     replyToMessageId,
   });
+}
+
+function resolveAttributedUser(
+  message: TelegramMessage,
+): TelegramUser | undefined {
+  const forwardOrigin = message.forward_origin;
+  if (forwardOrigin?.type === "user") {
+    return forwardOrigin.sender_user;
+  }
+
+  return message.from;
 }
 
 async function tryHandleCommand(
