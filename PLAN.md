@@ -219,6 +219,17 @@ ongoing cost and operational burden.
 - [x] docs: add operator guidance for synthetic benchmark generation and
       privacy-safe demo capture
 
+### Queue-Based Summarization Checklist
+
+- [x] docs: add queue rollout plan and commit boundaries
+- [ ] feat(config): add queue binding + payload types + consumer entrypoint scaffold
+- [ ] feat(cron): enqueue daily summary jobs instead of inline summarize/send
+- [ ] feat(webhook): enqueue `/summary` and `/summaryday` jobs and return `200`
+      without interim bot replies
+- [ ] feat(consumer): process queued summary jobs (summarize + Telegram send)
+- [ ] feat(reliability): add idempotency guard for at-least-once queue delivery
+- [ ] docs: update README + ops runbook for queue operation and failure handling
+
 ## Implementation Notes
 
 - Secrets/env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
@@ -237,6 +248,12 @@ ongoing cost and operational burden.
   types we handle (currently `message`, `edited_message`) to reduce noise.
 - Register bot commands (BotFather or `setMyCommands`) for `/summary`,
   `/summaryday`, `/status` so they show in the UI.
+- Queue rollout target:
+  - Webhook + cron become enqueue-only for summary generation.
+  - Queue consumer runs heavy summary work and sends Telegram messages.
+  - `/summary` and `/summaryday` do not send immediate "processing" replies.
+  - Queue v1 uses default retries and no DLQ.
+  - Consumer processing must be idempotent because queue delivery is at-least-once.
 - Code quality split:
   - Prettier owns formatting.
   - ESLint (`typescript-eslint`) runs strict type-checked and stylistic presets.
