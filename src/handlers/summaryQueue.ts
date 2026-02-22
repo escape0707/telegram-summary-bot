@@ -2,12 +2,9 @@ import { processSummaryQueueBatch } from "../app/queue/processSummaryQueueBatch.
 import type { Env } from "../env.js";
 import type { SummaryQueueMessage } from "../queue/summaryJobs.js";
 
-export function handleSummaryQueue(
+export async function handleSummaryQueue(
   batch: MessageBatch<SummaryQueueMessage>,
   env: Env,
-  ctx: ExecutionContext,
-): void {
-  void env;
-  void ctx;
-  processSummaryQueueBatch(batch);
+): Promise<void> {
+  await processSummaryQueueBatch(batch, env);
 }

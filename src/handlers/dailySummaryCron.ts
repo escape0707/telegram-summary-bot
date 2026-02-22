@@ -13,7 +13,7 @@ export async function handleDailySummaryCron(
     "cron.daily_summary",
     async () => {
       const runtime = requireTelegramRuntime(env);
-      await runDailySummary(controller, env, runtime, ctx.waitUntil.bind(ctx));
+      await runDailySummary(controller, env, runtime);
     },
     ctx.waitUntil.bind(ctx),
   );

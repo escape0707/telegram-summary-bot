@@ -21,7 +21,7 @@ export default {
   scheduled(controller, env, ctx) {
     ctx.waitUntil(handleDailySummaryCron(controller, env, ctx));
   },
-  queue(batch: MessageBatch<SummaryQueueMessage>, env, ctx) {
-    handleSummaryQueue(batch, env, ctx);
+  async queue(batch: MessageBatch<SummaryQueueMessage>, env) {
+    await handleSummaryQueue(batch, env);
   },
 } satisfies ExportedHandler<Env, SummaryQueueMessage>;

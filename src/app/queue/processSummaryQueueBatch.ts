@@ -1,8 +1,115 @@
-import type { SummaryQueueMessage } from "../../queue/summaryJobs.js";
+import {
+  SUMMARY_RUN_SOURCE_REAL_USAGE,
+  SUMMARY_RUN_TYPE_DAILY_CRON,
+} from "../../db/summaryRuns.js";
+import type { Env } from "../../env.js";
+import { AppError, ErrorCode } from "../../errors/appError.js";
+import type { SummaryCommand } from "../../telegram/commands.js";
+import { sendMessageToChat } from "../../telegram/send.js";
+import { buildDailySummaryMessage } from "../../telegram/texts.js";
+import {
+  SUMMARY_JOB_TYPE_DAILY,
+  SUMMARY_JOB_TYPE_ON_DEMAND,
+  type DailySummaryJob,
+  type SummaryQueueMessage,
+} from "../../queue/summaryJobs.js";
+import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
 
-export function processSummaryQueueBatch(
+const DAILY_SUMMARY_COMMAND: SummaryCommand = {
+  type: "summary",
+  fromHours: 24,
+  toHours: 0,
+};
+
+const RETRY_DELAY_SECONDS_DEFAULT = 10;
+const RETRY_DELAY_SECONDS_AI_ERROR = 30;
+const RETRY_DELAY_SECONDS_CONFIG = 60;
+
+type QueueDisposition =
+  | { action: "ack" }
+  | { action: "retry"; delaySeconds: number };
+
+function readRequiredBotToken(env: Env): string {
+  const token = env.TELEGRAM_BOT_TOKEN.trim();
+  if (!token) {
+    throw new AppError(
+      ErrorCode.ConfigMissing,
+      "TELEGRAM_BOT_TOKEN is not configured",
+    );
+  }
+
+  return token;
+}
+
+async function processDailySummaryJob(
+  env: Env,
+  botToken: string,
+  job: DailySummaryJob,
+): Promise<QueueDisposition> {
+  const summaryResult = await runTrackedSummarizeWindow(env, {
+    chatId: job.chatId,
+    chatUsername: job.chatUsername,
+    windowStart: job.windowStart,
+    windowEnd: job.windowEnd,
+    command: DAILY_SUMMARY_COMMAND,
+    summaryRunContext: {
+      source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+      runType: SUMMARY_RUN_TYPE_DAILY_CRON,
+    },
+  });
+
+  if (!summaryResult.ok) {
+    switch (summaryResult.reason) {
+      case "no_messages":
+      case "no_text":
+      case "degraded":
+        return { action: "ack" };
+      case "ai_error":
+        return { action: "retry", delaySeconds: RETRY_DELAY_SECONDS_AI_ERROR };
+      default: {
+        const exhaustiveCheck: never = summaryResult.reason;
+        return exhaustiveCheck;
+      }
+    }
+  }
+
+  const sent = await sendMessageToChat(
+    botToken,
+    job.chatId,
+    buildDailySummaryMessage(summaryResult.summary),
+  );
+  if (!sent) {
+    return { action: "retry", delaySeconds: RETRY_DELAY_SECONDS_DEFAULT };
+  }
+
+  return { action: "ack" };
+}
+
+async function processSummaryQueueMessage(
+  env: Env,
+  botToken: string,
+  job: SummaryQueueMessage,
+): Promise<QueueDisposition> {
+  switch (job.type) {
+    case SUMMARY_JOB_TYPE_DAILY:
+      return await processDailySummaryJob(env, botToken, job);
+    case SUMMARY_JOB_TYPE_ON_DEMAND:
+      // On-demand queue jobs are introduced in a later rollout step.
+      console.warn("Ignoring on-demand summary queue message before rollout", {
+        jobId: job.jobId,
+      });
+      return { action: "ack" };
+    default: {
+      const exhaustiveCheck: never = job;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+export async function processSummaryQueueBatch(
   batch: MessageBatch<SummaryQueueMessage>,
-): void {
+  env: Env,
+): Promise<void> {
   if (batch.messages.length === 0) {
     return;
   }
@@ -11,5 +118,32 @@ export function processSummaryQueueBatch(
     queue: batch.queue,
     size: batch.messages.length,
   });
-  batch.ackAll();
+
+  let botToken: string;
+  try {
+    botToken = readRequiredBotToken(env);
+  } catch (error) {
+    console.error("Failed to initialize summary queue consumer", { error });
+    batch.retryAll({ delaySeconds: RETRY_DELAY_SECONDS_CONFIG });
+    return;
+  }
+
+  for (const message of batch.messages) {
+    try {
+      const disposition = await processSummaryQueueMessage(env, botToken, message.body);
+      if (disposition.action === "retry") {
+        message.retry({ delaySeconds: disposition.delaySeconds });
+      } else {
+        message.ack();
+      }
+    } catch (error) {
+      console.error("Failed to process summary queue message", {
+        queue: batch.queue,
+        messageId: message.id,
+        attempts: message.attempts,
+        error,
+      });
+      message.retry({ delaySeconds: RETRY_DELAY_SECONDS_DEFAULT });
+    }
+  }
 }
