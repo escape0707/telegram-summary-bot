@@ -222,7 +222,7 @@ ongoing cost and operational burden.
 ### Queue-Based Summarization Checklist
 
 - [x] docs: add queue rollout plan and commit boundaries
-- [ ] feat(config): add queue binding + payload types + consumer entrypoint scaffold
+- [x] feat(config): add queue binding + payload types + consumer entrypoint scaffold
 - [ ] feat(cron): enqueue daily summary jobs instead of inline summarize/send
 - [ ] feat(webhook): enqueue `/summary` and `/summaryday` jobs and return `200`
       without interim bot replies

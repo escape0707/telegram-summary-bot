@@ -1,7 +1,9 @@
 import { handleDailySummaryCron } from "./handlers/dailySummaryCron.js";
+import { handleSummaryQueue } from "./handlers/summaryQueue.js";
 import { handleTelegramWebhook } from "./handlers/telegramWebhook.js";
 import { HEALTH_PATH, TELEGRAM_PATH } from "./config.js";
 import type { Env } from "./env.js";
+import type { SummaryQueueMessage } from "./queue/summaryJobs.js";
 
 export default {
   async fetch(request, env, ctx) {
@@ -19,4 +21,7 @@ export default {
   scheduled(controller, env, ctx) {
     ctx.waitUntil(handleDailySummaryCron(controller, env, ctx));
   },
-} satisfies ExportedHandler<Env>;
+  queue(batch: MessageBatch<SummaryQueueMessage>, env, ctx) {
+    handleSummaryQueue(batch, env, ctx);
+  },
+} satisfies ExportedHandler<Env, SummaryQueueMessage>;

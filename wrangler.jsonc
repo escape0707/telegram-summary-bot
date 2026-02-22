@@ -21,6 +21,21 @@
   "ai": {
     "binding": "AI",
   },
+  "queues": {
+    "producers": [
+      {
+        "binding": "SUMMARY_QUEUE",
+        "queue": "summary-jobs",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "summary-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
+      },
+    ],
+  },
   "triggers": {
     "crons": ["0 8 * * *"],
   },
