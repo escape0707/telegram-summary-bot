@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
-import { sendMessageToChat } from "../../telegram/send.js";
+import { sendMessageToChat, sendReplyToChatMessage } from "../../telegram/send.js";
 import type { Env } from "../../env.js";
 import type { SummaryQueueMessage } from "../../queue/summaryJobs.js";
 import { processSummaryQueueBatch } from "./processSummaryQueueBatch.js";
@@ -11,6 +11,7 @@ vi.mock("../summary/summarizeWindow.js", () => ({
 
 vi.mock("../../telegram/send.js", () => ({
   sendMessageToChat: vi.fn(),
+  sendReplyToChatMessage: vi.fn(),
 }));
 
 type BatchControl = {
@@ -105,6 +106,7 @@ describe("processSummaryQueueBatch", () => {
       summary: "<b>summary</b>",
     });
     vi.mocked(sendMessageToChat).mockResolvedValue(true);
+    vi.mocked(sendReplyToChatMessage).mockResolvedValue(true);
   });
 
   it("summarizes daily jobs, sends message, and acks", async () => {
@@ -175,15 +177,62 @@ describe("processSummaryQueueBatch", () => {
     expect(retryFns[0]).not.toHaveBeenCalled();
   });
 
-  it("acks on-demand jobs before on-demand rollout", async () => {
+  it("summarizes on-demand jobs, replies to command message, and acks", async () => {
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeOnDemandJob()]);
 
     await processSummaryQueueBatch(batch, env);
 
-    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(runTrackedSummarizeWindow).toHaveBeenCalledWith(env, {
+      chatId: -1001,
+      chatUsername: "group_a",
+      windowStart: -3400,
+      windowEnd: 200,
+      command: { type: "summary", fromHours: 1, toHours: 0 },
+      summaryRunContext: {
+        source: "real_usage",
+        runType: "on_demand",
+      },
+    });
+    expect(sendReplyToChatMessage).toHaveBeenCalledWith(
+      "bot-token",
+      -1001,
+      10,
+      "<b>summary</b>",
+    );
     expect(sendMessageToChat).not.toHaveBeenCalled();
     expect(ackFns[0]).toHaveBeenCalledTimes(1);
     expect(retryFns[0]).not.toHaveBeenCalled();
+  });
+
+  it("replies with no messages text for on-demand jobs", async () => {
+    vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
+      ok: false,
+      reason: "no_messages",
+    });
+    const env = makeEnv();
+    const { batch, ackFns, retryFns } = makeBatch([makeOnDemandJob()]);
+
+    await processSummaryQueueBatch(batch, env);
+
+    expect(sendReplyToChatMessage).toHaveBeenCalledWith(
+      "bot-token",
+      -1001,
+      10,
+      "No messages found in that window.",
+    );
+    expect(ackFns[0]).toHaveBeenCalledTimes(1);
+    expect(retryFns[0]).not.toHaveBeenCalled();
+  });
+
+  it("retries on-demand jobs when Telegram reply fails", async () => {
+    vi.mocked(sendReplyToChatMessage).mockResolvedValue(false);
+    const env = makeEnv();
+    const { batch, ackFns, retryFns } = makeBatch([makeOnDemandJob()]);
+
+    await processSummaryQueueBatch(batch, env);
+
+    expect(ackFns[0]).not.toHaveBeenCalled();
+    expect(retryFns[0]).toHaveBeenCalledWith({ delaySeconds: 10 });
   });
 });

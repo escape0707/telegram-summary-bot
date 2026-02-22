@@ -4,7 +4,7 @@ import { cleanupStaleRateLimits } from "../../db/rateLimits.js";
 import type { Env } from "../../env.js";
 import { AppError, ErrorCode } from "../../errors/appError.js";
 import type { SummaryQueueMessage } from "../../queue/summaryJobs.js";
-import { enqueueSummaryJobs } from "../../queue/enqueueSummaryJob.js";
+import { enqueueSummaryJobs } from "../../queue/summaryQueueProducer.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
 import { runDailySummary } from "./runDailySummary.js";
 
@@ -16,9 +16,15 @@ vi.mock("../../db/rateLimits.js", () => ({
   cleanupStaleRateLimits: vi.fn(),
 }));
 
-vi.mock("../../queue/enqueueSummaryJob.js", () => ({
-  enqueueSummaryJobs: vi.fn(),
-}));
+vi.mock("../../queue/summaryQueueProducer.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../queue/summaryQueueProducer.js")>();
+
+  return {
+    ...actual,
+    enqueueSummaryJobs: vi.fn(),
+  };
+});
 
 function makeEnv(): Env {
   return {

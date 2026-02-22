@@ -23,3 +23,12 @@ export async function sendMessageToChat(
 ): Promise<boolean> {
   return await sendTelegramMessage(botToken, chatId, text);
 }
+
+export async function sendReplyToChatMessage(
+  botToken: string,
+  chatId: number,
+  replyToMessageId: number,
+  text: string,
+): Promise<boolean> {
+  return await sendTelegramMessage(botToken, chatId, text, replyToMessageId);
+}

@@ -225,9 +225,9 @@ ongoing cost and operational burden.
 - [x] feat(config): add queue binding + payload types + consumer entrypoint scaffold
 - [x] feat(cron): enqueue daily summary jobs instead of inline summarize/send
 - [x] feat(consumer): process queued daily summary jobs (summarize + Telegram send)
-- [ ] feat(webhook): enqueue `/summary` and `/summaryday` jobs and return `200`
+- [x] feat(webhook): enqueue `/summary` and `/summaryday` jobs and return `200`
       without interim bot replies
-- [ ] feat(consumer): process queued on-demand summary jobs and reply to source
+- [x] feat(consumer): process queued on-demand summary jobs and reply to source
       command message
 - [ ] feat(reliability): add idempotency guard for at-least-once queue delivery
 - [ ] docs: update README + ops runbook for queue operation and failure handling

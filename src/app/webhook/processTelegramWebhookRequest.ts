@@ -2,21 +2,22 @@ import { TELEGRAM_SECRET_HEADER } from "../../config.js";
 import { insertMessage } from "../../db/messages.js";
 import { enforceSummaryRateLimit } from "../../db/rateLimits.js";
 import { loadServiceStatusSnapshot } from "../../db/serviceStats.js";
-import {
-  SUMMARY_RUN_SOURCE_REAL_USAGE,
-  SUMMARY_RUN_TYPE_ON_DEMAND,
-} from "../../db/summaryRuns.js";
 import type { Env } from "../../env.js";
 import {
   resolveCommandAccess,
   type CommandAccessContext,
 } from "./commandAccess.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
-import {
-  runTrackedSummarizeWindow,
-  type WindowSummaryResult,
-} from "../summary/summarizeWindow.js";
 import { isChatAllowed } from "../../telegram/allowlist.js";
+import {
+  enqueueSummaryJob,
+  requireSummaryQueue,
+} from "../../queue/summaryQueueProducer.js";
+import {
+  SUMMARY_JOB_TYPE_ON_DEMAND,
+  type OnDemandSummaryJob,
+  type SummaryQueueMessage,
+} from "../../queue/summaryJobs.js";
 import {
   buildCommandParseErrorText,
   hasBotCommandAtStart,
@@ -27,7 +28,6 @@ import { sendReplyToMessage } from "../../telegram/send.js";
 import {
   buildBlockedChatReplyText,
   buildHelpCommandReplyText,
-  buildSummaryDegradedText,
   buildStartCommandReplyText,
   buildStatusText,
   buildSummaryRateLimitText,
@@ -44,7 +44,6 @@ export async function processTelegramWebhookRequest(
   env: Env,
   runtime: TelegramRuntime,
   webhookSecret: string,
-  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<Response> {
   const providedSecret = request.headers.get(TELEGRAM_SECRET_HEADER);
   if (providedSecret !== webhookSecret) {
@@ -79,7 +78,6 @@ export async function processTelegramWebhookRequest(
         allowedChat,
         isPrivateChat,
       },
-      waitUntil,
     );
     if (response) {
       return response;
@@ -162,7 +160,6 @@ async function tryHandleCommand(
   runtime: TelegramRuntime,
   message: TelegramMessage & { text: string },
   access: CommandAccessContext,
-  waitUntil?: ExecutionContext["waitUntil"],
 ): Promise<Response | undefined> {
   const commandResult = parseTelegramCommand(message.text);
   if (!commandResult.ok) {
@@ -190,13 +187,12 @@ async function tryHandleCommand(
 
   switch (command.type) {
     case "summary": {
-      const replyText = await resolveSummaryCommandReplyText(
+      return await enqueueSummaryCommand(
         env,
+        runtime.botToken,
         message,
         command,
-        waitUntil,
       );
-      return await sendCommandReply(runtime.botToken, message, replyText);
     }
     case "status": {
       try {
@@ -227,12 +223,12 @@ async function tryHandleCommand(
   }
 }
 
-async function resolveSummaryCommandReplyText(
+async function enqueueSummaryCommand(
   env: Env,
+  botToken: string,
   message: TelegramMessage & { text: string },
   command: SummaryCommand,
-  waitUntil?: ExecutionContext["waitUntil"],
-): Promise<string> {
+): Promise<Response> {
   try {
     const rateLimit = await enforceSummaryRateLimit(
       env,
@@ -241,53 +237,48 @@ async function resolveSummaryCommandReplyText(
       message.date,
     );
     if (!rateLimit.allowed) {
-      return buildSummaryRateLimitText(rateLimit);
+      return await sendCommandReply(
+        botToken,
+        message,
+        buildSummaryRateLimitText(rateLimit),
+      );
     }
   } catch (error) {
     // Fail-open to avoid blocking usage when rate-limit storage is unhealthy.
     console.error("Failed to check summary rate limit", error);
   }
 
-  const windowStart = message.date - command.fromHours * 60 * 60;
-  const windowEnd = message.date - command.toHours * 60 * 60;
-
-  let summaryResult: WindowSummaryResult;
+  let summaryQueue: Queue<SummaryQueueMessage>;
   try {
-    summaryResult = await runTrackedSummarizeWindow(env, {
-      chatId: message.chat.id,
-      chatUsername: message.chat.username,
-      windowStart,
-      windowEnd,
-      command,
-      summaryRunContext: {
-        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
-        runType: SUMMARY_RUN_TYPE_ON_DEMAND,
-        ...(waitUntil ? { waitUntil } : {}),
-      },
-    });
+    summaryQueue = requireSummaryQueue(env);
   } catch (error) {
-    console.error("Failed to load messages for summary", error);
-    return "Failed to load messages for summary.";
+    console.error("Summary queue is not configured", { error });
+    return new Response("internal error", { status: 500 });
   }
 
-  if (summaryResult.ok) {
-    return summaryResult.summary;
+  const job: OnDemandSummaryJob = {
+    type: SUMMARY_JOB_TYPE_ON_DEMAND,
+    jobId: `on_demand:${message.chat.id}:${message.message_id}`,
+    chatId: message.chat.id,
+    ...(message.chat.username ? { chatUsername: message.chat.username } : {}),
+    command,
+    requestedAtTs: message.date,
+    requesterUserId: message.from?.id ?? null,
+    replyToMessageId: message.message_id,
+  };
+
+  try {
+    await enqueueSummaryJob(summaryQueue, job);
+  } catch (error) {
+    console.error("Failed to enqueue on-demand summary job", {
+      chatId: message.chat.id,
+      messageId: message.message_id,
+      error,
+    });
+    return new Response("internal error", { status: 500 });
   }
 
-  switch (summaryResult.reason) {
-    case "no_messages":
-      return "No messages found in that window.";
-    case "no_text":
-      return "No text messages found in that window.";
-    case "ai_error":
-      return "Failed to generate summary (check logs).";
-    case "degraded":
-      return buildSummaryDegradedText();
-    default: {
-      const exhaustiveCheck: never = summaryResult.reason;
-      return exhaustiveCheck;
-    }
-  }
+  return new Response("ok", { status: 200 });
 }
 
 async function sendCommandReply(

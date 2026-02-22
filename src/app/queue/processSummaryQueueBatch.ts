@@ -1,16 +1,18 @@
 import {
   SUMMARY_RUN_SOURCE_REAL_USAGE,
   SUMMARY_RUN_TYPE_DAILY_CRON,
+  SUMMARY_RUN_TYPE_ON_DEMAND,
 } from "../../db/summaryRuns.js";
 import type { Env } from "../../env.js";
 import { AppError, ErrorCode } from "../../errors/appError.js";
 import type { SummaryCommand } from "../../telegram/commands.js";
-import { sendMessageToChat } from "../../telegram/send.js";
-import { buildDailySummaryMessage } from "../../telegram/texts.js";
+import { sendMessageToChat, sendReplyToChatMessage } from "../../telegram/send.js";
+import { buildDailySummaryMessage, buildSummaryDegradedText } from "../../telegram/texts.js";
 import {
   SUMMARY_JOB_TYPE_DAILY,
   SUMMARY_JOB_TYPE_ON_DEMAND,
   type DailySummaryJob,
+  type OnDemandSummaryJob,
   type SummaryQueueMessage,
 } from "../../queue/summaryJobs.js";
 import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
@@ -85,6 +87,63 @@ async function processDailySummaryJob(
   return { action: "ack" };
 }
 
+async function processOnDemandSummaryJob(
+  env: Env,
+  botToken: string,
+  job: OnDemandSummaryJob,
+): Promise<QueueDisposition> {
+  const windowStart = job.requestedAtTs - job.command.fromHours * 60 * 60;
+  const windowEnd = job.requestedAtTs - job.command.toHours * 60 * 60;
+
+  const summaryResult = await runTrackedSummarizeWindow(env, {
+    chatId: job.chatId,
+    chatUsername: job.chatUsername,
+    windowStart,
+    windowEnd,
+    command: job.command,
+    summaryRunContext: {
+      source: SUMMARY_RUN_SOURCE_REAL_USAGE,
+      runType: SUMMARY_RUN_TYPE_ON_DEMAND,
+    },
+  });
+
+  let replyText: string;
+  if (summaryResult.ok) {
+    replyText = summaryResult.summary;
+  } else {
+    switch (summaryResult.reason) {
+      case "no_messages":
+        replyText = "No messages found in that window.";
+        break;
+      case "no_text":
+        replyText = "No text messages found in that window.";
+        break;
+      case "ai_error":
+        replyText = "Failed to generate summary (check logs).";
+        break;
+      case "degraded":
+        replyText = buildSummaryDegradedText();
+        break;
+      default: {
+        const exhaustiveCheck: never = summaryResult.reason;
+        return exhaustiveCheck;
+      }
+    }
+  }
+
+  const sent = await sendReplyToChatMessage(
+    botToken,
+    job.chatId,
+    job.replyToMessageId,
+    replyText,
+  );
+  if (!sent) {
+    return { action: "retry", delaySeconds: RETRY_DELAY_SECONDS_DEFAULT };
+  }
+
+  return { action: "ack" };
+}
+
 async function processSummaryQueueMessage(
   env: Env,
   botToken: string,
@@ -94,11 +153,7 @@ async function processSummaryQueueMessage(
     case SUMMARY_JOB_TYPE_DAILY:
       return await processDailySummaryJob(env, botToken, job);
     case SUMMARY_JOB_TYPE_ON_DEMAND:
-      // On-demand queue jobs are introduced in a later rollout step.
-      console.warn("Ignoring on-demand summary queue message before rollout", {
-        jobId: job.jobId,
-      });
-      return { action: "ack" };
+      return await processOnDemandSummaryJob(env, botToken, job);
     default: {
       const exhaustiveCheck: never = job;
       return exhaustiveCheck;

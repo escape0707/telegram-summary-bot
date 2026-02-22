@@ -4,12 +4,9 @@ import type { Env } from "../../env.js";
 import { insertMessage } from "../../db/messages.js";
 import { enforceSummaryRateLimit } from "../../db/rateLimits.js";
 import { loadServiceStatusSnapshot } from "../../db/serviceStats.js";
-import {
-  SUMMARY_RUN_SOURCE_REAL_USAGE,
-  SUMMARY_RUN_TYPE_ON_DEMAND,
-} from "../../db/summaryRuns.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
-import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
+import { enqueueSummaryJob } from "../../queue/summaryQueueProducer.js";
+import type { SummaryQueueMessage } from "../../queue/summaryJobs.js";
 import { sendReplyToMessage } from "../../telegram/send.js";
 import type {
   TelegramChatType,
@@ -29,9 +26,15 @@ vi.mock("../../db/serviceStats.js", () => ({
   loadServiceStatusSnapshot: vi.fn(),
 }));
 
-vi.mock("../summary/summarizeWindow.js", () => ({
-  runTrackedSummarizeWindow: vi.fn(),
-}));
+vi.mock("../../queue/summaryQueueProducer.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../queue/summaryQueueProducer.js")>();
+
+  return {
+    ...actual,
+    enqueueSummaryJob: vi.fn(),
+  };
+});
 
 vi.mock("../../telegram/send.js", () => ({
   sendReplyToMessage: vi.fn(),
@@ -61,6 +64,7 @@ function makeEnv(): Env {
   return {
     DB: {} as D1Database,
     AI: {} as Ai,
+    SUMMARY_QUEUE: {} as Queue<SummaryQueueMessage>,
     TELEGRAM_WEBHOOK_SECRET: WEBHOOK_SECRET,
     TELEGRAM_BOT_TOKEN: "bot-token",
     TELEGRAM_ALLOWED_CHAT_IDS: "",
@@ -199,14 +203,11 @@ describe("processTelegramWebhookRequest", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(sendReplyToMessage).mockResolvedValue(true);
+    vi.mocked(enqueueSummaryJob).mockResolvedValue();
     vi.mocked(enforceSummaryRateLimit).mockResolvedValue({ allowed: true });
     vi.mocked(loadServiceStatusSnapshot).mockResolvedValue(
       makeStatusSnapshot(),
     );
-    vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
-      ok: true,
-      summary: "<b>summary</b>",
-    });
   });
 
   it("returns 401 for invalid webhook secret", async () => {
@@ -225,7 +226,7 @@ describe("processTelegramWebhookRequest", () => {
     expect(sendReplyToMessage).not.toHaveBeenCalled();
   });
 
-  it("summarizes and replies in an allowlisted group", async () => {
+  it("enqueues summary command in an allowlisted group and does not reply immediately", async () => {
     const chatId = -1001;
     const fromUserId = 42;
     const nowSeconds = 10_000;
@@ -236,7 +237,6 @@ describe("processTelegramWebhookRequest", () => {
 
     const env = makeEnv();
     const runtime = makeRuntime(new Set<number>([chatId]));
-    const waitUntil = vi.fn<(promise: Promise<void>) => void>();
     const update = makeCommandUpdate(commandText, {
       chatId,
       chatType: "supergroup",
@@ -250,7 +250,6 @@ describe("processTelegramWebhookRequest", () => {
       env,
       runtime,
       WEBHOOK_SECRET,
-      waitUntil,
     );
 
     expect(response.status).toBe(200);
@@ -260,23 +259,17 @@ describe("processTelegramWebhookRequest", () => {
       fromUserId,
       nowSeconds,
     );
-    expect(runTrackedSummarizeWindow).toHaveBeenCalledWith(env, {
+    expect(enqueueSummaryJob).toHaveBeenCalledWith(env.SUMMARY_QUEUE, {
+      type: "on_demand",
+      jobId: `on_demand:${chatId}:${update.message.message_id}`,
       chatId,
       chatUsername,
-      windowStart: nowSeconds - fromHours * 60 * 60,
-      windowEnd: nowSeconds - toHours * 60 * 60,
       command: { type: "summary", fromHours, toHours },
-      summaryRunContext: {
-        source: SUMMARY_RUN_SOURCE_REAL_USAGE,
-        runType: SUMMARY_RUN_TYPE_ON_DEMAND,
-        waitUntil,
-      },
+      requestedAtTs: nowSeconds,
+      requesterUserId: fromUserId,
+      replyToMessageId: update.message.message_id,
     });
-    expect(sendReplyToMessage).toHaveBeenCalledWith(
-      "bot-token",
-      update.message,
-      "<b>summary</b>",
-    );
+    expect(sendReplyToMessage).not.toHaveBeenCalled();
     expect(insertMessage).not.toHaveBeenCalled();
   });
 
@@ -296,7 +289,7 @@ describe("processTelegramWebhookRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(enqueueSummaryJob).not.toHaveBeenCalled();
     expect(sendReplyToMessage).toHaveBeenCalledWith(
       "bot-token",
       update.message,
@@ -323,12 +316,12 @@ describe("processTelegramWebhookRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(enqueueSummaryJob).not.toHaveBeenCalled();
     const replyText = vi.mocked(sendReplyToMessage).mock.calls[0]?.[2];
     expect(replyText).toContain("Usage: /summary");
   });
 
-  it("replies with rate-limit text and skips summary generation when limited", async () => {
+  it("replies with rate-limit text and skips summary enqueue when limited", async () => {
     vi.mocked(enforceSummaryRateLimit).mockResolvedValue({
       allowed: false,
       scope: "chat",
@@ -353,18 +346,14 @@ describe("processTelegramWebhookRequest", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(enqueueSummaryJob).not.toHaveBeenCalled();
     const replyText = vi.mocked(sendReplyToMessage).mock.calls[0]?.[2];
     expect(replyText).toContain("Rate limit exceeded for this chat.");
     expect(replyText).toContain("Try again in 2m.");
   });
 
-  it("replies with degraded message when summary backend is temporarily degraded", async () => {
-    vi.mocked(runTrackedSummarizeWindow).mockResolvedValue({
-      ok: false,
-      reason: "degraded",
-    });
-
+  it("returns 500 when summary job enqueue fails", async () => {
+    vi.mocked(enqueueSummaryJob).mockRejectedValue(new Error("queue down"));
     const env = makeEnv();
     const runtime = makeRuntime(new Set<number>([-1001]));
     const update = makeCommandUpdate("/summary", {
@@ -380,11 +369,29 @@ describe("processTelegramWebhookRequest", () => {
       WEBHOOK_SECRET,
     );
 
-    expect(response.status).toBe(200);
-    const replyText = vi.mocked(sendReplyToMessage).mock.calls[0]?.[2];
-    expect(replyText).toContain(
-      "Summary generation is temporarily unavailable due to recent AI failures.",
+    expect(response.status).toBe(500);
+    expect(sendReplyToMessage).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when SUMMARY_QUEUE binding is missing", async () => {
+    const env = makeEnv();
+    delete env.SUMMARY_QUEUE;
+    const runtime = makeRuntime(new Set<number>([-1001]));
+    const update = makeCommandUpdate("/summary", {
+      chatId: -1001,
+      chatType: "supergroup",
+    });
+
+    const response = await processTelegramWebhookRequest(
+      makeRequest(update),
+      env,
+      runtime,
+      WEBHOOK_SECRET,
     );
+
+    expect(response.status).toBe(500);
+    expect(enqueueSummaryJob).not.toHaveBeenCalled();
+    expect(sendReplyToMessage).not.toHaveBeenCalled();
   });
 
   it("ignores unknown commands without replying", async () => {
@@ -404,7 +411,7 @@ describe("processTelegramWebhookRequest", () => {
 
     expect(response.status).toBe(200);
     expect(sendReplyToMessage).not.toHaveBeenCalled();
-    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(enqueueSummaryJob).not.toHaveBeenCalled();
     expect(insertMessage).not.toHaveBeenCalled();
   });
 
@@ -448,7 +455,7 @@ describe("processTelegramWebhookRequest", () => {
 
     expect(response.status).toBe(200);
     expect(sendReplyToMessage).not.toHaveBeenCalled();
-    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(enqueueSummaryJob).not.toHaveBeenCalled();
     expect(insertMessage).not.toHaveBeenCalled();
   });
 

@@ -26,7 +26,6 @@ export async function handleTelegramWebhook(
         env,
         runtime,
         webhookSecret,
-        ctx.waitUntil.bind(ctx),
       );
     },
     ctx.waitUntil.bind(ctx),

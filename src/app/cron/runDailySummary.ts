@@ -4,21 +4,16 @@ import type { Env } from "../../env.js";
 import { AppError, ErrorCode } from "../../errors/appError.js";
 import type { TelegramRuntime } from "../runtime/telegramRuntime.js";
 import { isChatAllowed } from "../../telegram/allowlist.js";
-import { enqueueSummaryJobs } from "../../queue/enqueueSummaryJob.js";
+import {
+  enqueueSummaryJobs,
+  requireSummaryQueue,
+} from "../../queue/summaryQueueProducer.js";
 import {
   SUMMARY_JOB_TYPE_DAILY,
-  type SummaryQueueMessage,
+  type DailySummaryJob,
 } from "../../queue/summaryJobs.js";
 
 const DAY_SECONDS = 24 * 60 * 60;
-
-function requireSummaryQueue(env: Env): Queue<SummaryQueueMessage> {
-  if (!env.SUMMARY_QUEUE) {
-    throw new AppError(ErrorCode.ConfigMissing, "SUMMARY_QUEUE is not configured");
-  }
-
-  return env.SUMMARY_QUEUE;
-}
 
 export async function runDailySummary(
   controller: ScheduledController,
@@ -53,7 +48,7 @@ export async function runDailySummary(
     activeChats: chats.length,
   });
 
-  const jobs: SummaryQueueMessage[] = [];
+  const jobs: DailySummaryJob[] = [];
   let skippedNotAllowlisted = 0;
 
   for (const chat of chats) {
