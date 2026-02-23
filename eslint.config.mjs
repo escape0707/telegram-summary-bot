@@ -8,6 +8,7 @@ export default defineConfig(
     ignores: [
       "node_modules/",
       ".wrangler/",
+      "coverage/",
       "worker-configuration.d.ts",
       "eslint.config.mjs",
     ],
