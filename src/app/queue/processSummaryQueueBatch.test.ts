@@ -1,12 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  claimSummaryQueueJob,
+  markSummaryQueueJobDone,
+  releaseSummaryQueueJobClaim,
+} from "../../db/summaryQueueJobs.js";
 import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
 import { sendMessageToChat, sendReplyToChatMessage } from "../../telegram/send.js";
 import type { Env } from "../../env.js";
 import type { SummaryQueueMessage } from "../../queue/summaryJobs.js";
 import { processSummaryQueueBatch } from "./processSummaryQueueBatch.js";
 
+const TEST_BOT_TOKEN = "bot-token";
+const CLAIM_LEASE_UNTIL = 1_030;
+const CLAIM_UPDATED_AT = 1_000;
+
 vi.mock("../summary/summarizeWindow.js", () => ({
   runTrackedSummarizeWindow: vi.fn(),
+}));
+
+vi.mock("../../db/summaryQueueJobs.js", () => ({
+  claimSummaryQueueJob: vi.fn(),
+  markSummaryQueueJobDone: vi.fn(),
+  releaseSummaryQueueJobClaim: vi.fn(),
 }));
 
 vi.mock("../../telegram/send.js", () => ({
@@ -16,10 +31,14 @@ vi.mock("../../telegram/send.js", () => ({
 
 type BatchControl = {
   batch: MessageBatch<SummaryQueueMessage>;
-  ackFns: Array<ReturnType<typeof vi.fn>>;
-  retryFns: Array<ReturnType<typeof vi.fn>>;
-  retryAll: ReturnType<typeof vi.fn>;
+  ackFns: Array<AckFn>;
+  retryFns: Array<RetryFn>;
+  retryAll: ReturnType<typeof vi.fn<() => void>>;
 };
+
+type RetryOptions = Parameters<Message<SummaryQueueMessage>["retry"]>[0];
+type AckFn = ReturnType<typeof vi.fn<() => void>>;
+type RetryFn = ReturnType<typeof vi.fn<(options?: RetryOptions) => void>>;
 
 function makeEnv(): Env {
   return {
@@ -27,7 +46,7 @@ function makeEnv(): Env {
     AI: {} as Ai,
     SUMMARY_QUEUE: {} as Queue<SummaryQueueMessage>,
     TELEGRAM_WEBHOOK_SECRET: "secret",
-    TELEGRAM_BOT_TOKEN: "bot-token",
+    TELEGRAM_BOT_TOKEN: TEST_BOT_TOKEN,
     TELEGRAM_ALLOWED_CHAT_IDS: "",
     PROJECT_REPO_URL: "https://example.com/repo",
   };
@@ -63,12 +82,12 @@ function makeOnDemandJob(
 }
 
 function makeBatch(messages: SummaryQueueMessage[]): BatchControl {
-  const ackFns: Array<ReturnType<typeof vi.fn>> = [];
-  const retryFns: Array<ReturnType<typeof vi.fn>> = [];
+  const ackFns: Array<AckFn> = [];
+  const retryFns: Array<RetryFn> = [];
 
   const queueMessages = messages.map((body, index) => {
-    const ack = vi.fn();
-    const retry = vi.fn();
+    const ack = vi.fn<() => void>();
+    const retry = vi.fn<(options?: RetryOptions) => void>();
     ackFns.push(ack);
     retryFns.push(retry);
 
@@ -105,6 +124,13 @@ describe("processSummaryQueueBatch", () => {
       ok: true,
       summary: "<b>summary</b>",
     });
+    vi.mocked(claimSummaryQueueJob).mockResolvedValue({
+      status: "acquired",
+      leaseUntil: CLAIM_LEASE_UNTIL,
+      updatedAt: CLAIM_UPDATED_AT,
+    });
+    vi.mocked(markSummaryQueueJobDone).mockResolvedValue({ status: "marked" });
+    vi.mocked(releaseSummaryQueueJobClaim).mockResolvedValue();
     vi.mocked(sendMessageToChat).mockResolvedValue(true);
     vi.mocked(sendReplyToChatMessage).mockResolvedValue(true);
   });
@@ -113,7 +139,7 @@ describe("processSummaryQueueBatch", () => {
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
 
-    await processSummaryQueueBatch(batch, env);
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
 
     expect(runTrackedSummarizeWindow).toHaveBeenCalledWith(env, {
       chatId: -1001,
@@ -127,9 +153,16 @@ describe("processSummaryQueueBatch", () => {
       },
     });
     expect(sendMessageToChat).toHaveBeenCalledWith(
-      "bot-token",
+      TEST_BOT_TOKEN,
       -1001,
       "<b>Daily Summary (Auto, last 24h)</b>\n\n<b>summary</b>",
+    );
+    expect(markSummaryQueueJobDone).toHaveBeenCalledWith(
+      env,
+      "daily:-1001:100:200",
+      CLAIM_LEASE_UNTIL,
+      CLAIM_UPDATED_AT,
+      expect.any(Number),
     );
     expect(ackFns[0]).toHaveBeenCalledTimes(1);
     expect(retryFns[0]).not.toHaveBeenCalled();
@@ -143,7 +176,7 @@ describe("processSummaryQueueBatch", () => {
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
 
-    await processSummaryQueueBatch(batch, env);
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
 
     expect(sendMessageToChat).not.toHaveBeenCalled();
     expect(ackFns[0]).toHaveBeenCalledTimes(1);
@@ -158,30 +191,70 @@ describe("processSummaryQueueBatch", () => {
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
 
-    await processSummaryQueueBatch(batch, env);
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
 
     expect(ackFns[0]).not.toHaveBeenCalled();
     expect(retryFns[0]).toHaveBeenCalledWith({ delaySeconds: 30 });
+    expect(releaseSummaryQueueJobClaim).toHaveBeenCalledWith(
+      env,
+      "daily:-1001:100:200",
+      CLAIM_LEASE_UNTIL,
+      CLAIM_UPDATED_AT,
+    );
   });
 
-  it("retries whole batch when bot token is missing", async () => {
+  it("acks duplicate jobs that are already done", async () => {
+    vi.mocked(claimSummaryQueueJob).mockResolvedValue({ status: "already_done" });
     const env = makeEnv();
-    env.TELEGRAM_BOT_TOKEN = "  ";
-    const { batch, ackFns, retryFns, retryAll } = makeBatch([makeDailyJob()]);
+    const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
 
-    await processSummaryQueueBatch(batch, env);
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
 
-    expect(retryAll).toHaveBeenCalledWith({ delaySeconds: 60 });
+    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(sendMessageToChat).not.toHaveBeenCalled();
+    expect(ackFns[0]).toHaveBeenCalledTimes(1);
+    expect(retryFns[0]).not.toHaveBeenCalled();
+  });
+
+  it("retries jobs that are currently in_flight", async () => {
+    const leaseUntil = Math.floor(Date.now() / 1_000) + 60;
+    vi.mocked(claimSummaryQueueJob).mockResolvedValue({
+      status: "in_flight",
+      leaseUntil,
+    });
+    const env = makeEnv();
+    const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
+
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
+
     expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
     expect(ackFns[0]).not.toHaveBeenCalled();
-    expect(retryFns[0]).not.toHaveBeenCalled();
+    const retryFn = retryFns[0];
+    if (!retryFn) {
+      throw new Error("retry function missing");
+    }
+    const retryOptions = retryFn.mock.calls[0]?.[0];
+    expect(retryOptions?.delaySeconds).toBeGreaterThanOrEqual(55);
+    expect(retryOptions?.delaySeconds).toBeLessThanOrEqual(60);
+  });
+
+  it("retries when idempotency claim lookup fails", async () => {
+    vi.mocked(claimSummaryQueueJob).mockRejectedValue(new Error("db down"));
+    const env = makeEnv();
+    const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
+
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
+
+    expect(runTrackedSummarizeWindow).not.toHaveBeenCalled();
+    expect(ackFns[0]).not.toHaveBeenCalled();
+    expect(retryFns[0]).toHaveBeenCalledWith({ delaySeconds: 10 });
   });
 
   it("summarizes on-demand jobs, replies to command message, and acks", async () => {
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeOnDemandJob()]);
 
-    await processSummaryQueueBatch(batch, env);
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
 
     expect(runTrackedSummarizeWindow).toHaveBeenCalledWith(env, {
       chatId: -1001,
@@ -195,12 +268,40 @@ describe("processSummaryQueueBatch", () => {
       },
     });
     expect(sendReplyToChatMessage).toHaveBeenCalledWith(
-      "bot-token",
+      TEST_BOT_TOKEN,
       -1001,
       10,
       "<b>summary</b>",
     );
     expect(sendMessageToChat).not.toHaveBeenCalled();
+    expect(ackFns[0]).toHaveBeenCalledTimes(1);
+    expect(retryFns[0]).not.toHaveBeenCalled();
+  });
+
+  it("retries when recording done state fails after processing", async () => {
+    vi.mocked(markSummaryQueueJobDone).mockRejectedValue(new Error("db down"));
+    const env = makeEnv();
+    const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
+
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
+
+    expect(ackFns[0]).not.toHaveBeenCalled();
+    expect(retryFns[0]).toHaveBeenCalledWith({ delaySeconds: 10 });
+    expect(releaseSummaryQueueJobClaim).toHaveBeenCalledWith(
+      env,
+      "daily:-1001:100:200",
+      CLAIM_LEASE_UNTIL,
+      CLAIM_UPDATED_AT,
+    );
+  });
+
+  it("acks when completion write reports lost_claim", async () => {
+    vi.mocked(markSummaryQueueJobDone).mockResolvedValue({ status: "lost_claim" });
+    const env = makeEnv();
+    const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
+
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
+
     expect(ackFns[0]).toHaveBeenCalledTimes(1);
     expect(retryFns[0]).not.toHaveBeenCalled();
   });
@@ -213,10 +314,10 @@ describe("processSummaryQueueBatch", () => {
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeOnDemandJob()]);
 
-    await processSummaryQueueBatch(batch, env);
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
 
     expect(sendReplyToChatMessage).toHaveBeenCalledWith(
-      "bot-token",
+      TEST_BOT_TOKEN,
       -1001,
       10,
       "No messages found in that window.",
@@ -230,9 +331,15 @@ describe("processSummaryQueueBatch", () => {
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeOnDemandJob()]);
 
-    await processSummaryQueueBatch(batch, env);
+    await processSummaryQueueBatch(batch, env, TEST_BOT_TOKEN);
 
     expect(ackFns[0]).not.toHaveBeenCalled();
     expect(retryFns[0]).toHaveBeenCalledWith({ delaySeconds: 10 });
+    expect(releaseSummaryQueueJobClaim).toHaveBeenCalledWith(
+      env,
+      "on_demand:-1001:1",
+      CLAIM_LEASE_UNTIL,
+      CLAIM_UPDATED_AT,
+    );
   });
 });

@@ -1,16 +1,19 @@
 import {
+  claimSummaryQueueJob,
+  markSummaryQueueJobDone,
+  releaseSummaryQueueJobClaim,
+  type SummaryQueueJobClaimResult,
+} from "../../db/summaryQueueJobs.js";
+import {
   SUMMARY_RUN_SOURCE_REAL_USAGE,
   SUMMARY_RUN_TYPE_DAILY_CRON,
   SUMMARY_RUN_TYPE_ON_DEMAND,
 } from "../../db/summaryRuns.js";
 import type { Env } from "../../env.js";
-import { AppError, ErrorCode } from "../../errors/appError.js";
 import type { SummaryCommand } from "../../telegram/commands.js";
 import { sendMessageToChat, sendReplyToChatMessage } from "../../telegram/send.js";
 import { buildDailySummaryMessage, buildSummaryDegradedText } from "../../telegram/texts.js";
 import {
-  SUMMARY_JOB_TYPE_DAILY,
-  SUMMARY_JOB_TYPE_ON_DEMAND,
   type DailySummaryJob,
   type OnDemandSummaryJob,
   type SummaryQueueMessage,
@@ -25,22 +28,16 @@ const DAILY_SUMMARY_COMMAND: SummaryCommand = {
 
 const RETRY_DELAY_SECONDS_DEFAULT = 10;
 const RETRY_DELAY_SECONDS_AI_ERROR = 30;
-const RETRY_DELAY_SECONDS_CONFIG = 60;
+const RETRY_DELAY_SECONDS_IN_FLIGHT = 5;
+const JOB_CLAIM_LEASE_SECONDS = 300;
+const RETRY_DELAY_SECONDS_IN_FLIGHT_MAX = JOB_CLAIM_LEASE_SECONDS;
 
 type QueueDisposition =
   | { action: "ack" }
   | { action: "retry"; delaySeconds: number };
 
-function readRequiredBotToken(env: Env): string {
-  const token = env.TELEGRAM_BOT_TOKEN.trim();
-  if (!token) {
-    throw new AppError(
-      ErrorCode.ConfigMissing,
-      "TELEGRAM_BOT_TOKEN is not configured",
-    );
-  }
-
-  return token;
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1_000);
 }
 
 async function processDailySummaryJob(
@@ -144,26 +141,65 @@ async function processOnDemandSummaryJob(
   return { action: "ack" };
 }
 
-async function processSummaryQueueMessage(
+function computeInFlightRetryDelay(leaseUntil: number): number {
+  const waitSeconds = leaseUntil - nowSeconds();
+  return Math.max(
+    RETRY_DELAY_SECONDS_IN_FLIGHT,
+    Math.min(RETRY_DELAY_SECONDS_IN_FLIGHT_MAX, waitSeconds),
+  );
+}
+
+async function safeReleaseJobClaimWithOwnership(
   env: Env,
-  botToken: string,
-  job: SummaryQueueMessage,
-): Promise<QueueDisposition> {
-  switch (job.type) {
-    case SUMMARY_JOB_TYPE_DAILY:
-      return await processDailySummaryJob(env, botToken, job);
-    case SUMMARY_JOB_TYPE_ON_DEMAND:
-      return await processOnDemandSummaryJob(env, botToken, job);
-    default: {
-      const exhaustiveCheck: never = job;
-      return exhaustiveCheck;
-    }
+  jobId: string,
+  claim: Extract<SummaryQueueJobClaimResult, { status: "acquired" }>,
+): Promise<void> {
+  try {
+    await releaseSummaryQueueJobClaim(
+      env,
+      jobId,
+      claim.leaseUntil,
+      claim.updatedAt,
+    );
+  } catch (error) {
+    console.error("Failed to release summary queue job claim", {
+      jobId,
+      error,
+    });
+  }
+}
+
+async function safeMarkSummaryQueueJobDone(
+  batch: MessageBatch<SummaryQueueMessage>,
+  env: Env,
+  message: Message<SummaryQueueMessage>,
+  claim: Extract<SummaryQueueJobClaimResult, { status: "acquired" }>,
+): Promise<"marked" | "already_done" | "lost_claim" | "error"> {
+  const { jobId } = message.body;
+  try {
+    const doneResult = await markSummaryQueueJobDone(
+      env,
+      jobId,
+      claim.leaseUntil,
+      claim.updatedAt,
+      nowSeconds(),
+    );
+    return doneResult.status;
+  } catch (error) {
+    console.error("Failed to mark summary queue job done", {
+      queue: batch.queue,
+      messageId: message.id,
+      jobId,
+      error,
+    });
+    return "error";
   }
 }
 
 export async function processSummaryQueueBatch(
   batch: MessageBatch<SummaryQueueMessage>,
   env: Env,
+  botToken: string,
 ): Promise<void> {
   if (batch.messages.length === 0) {
     return;
@@ -174,30 +210,90 @@ export async function processSummaryQueueBatch(
     size: batch.messages.length,
   });
 
-  let botToken: string;
-  try {
-    botToken = readRequiredBotToken(env);
-  } catch (error) {
-    console.error("Failed to initialize summary queue consumer", { error });
-    batch.retryAll({ delaySeconds: RETRY_DELAY_SECONDS_CONFIG });
-    return;
-  }
-
   for (const message of batch.messages) {
+    let claim: SummaryQueueJobClaimResult;
     try {
-      const disposition = await processSummaryQueueMessage(env, botToken, message.body);
-      if (disposition.action === "retry") {
-        message.retry({ delaySeconds: disposition.delaySeconds });
-      } else {
-        message.ack();
+      claim = await claimSummaryQueueJob(
+        env,
+        message.body.jobId,
+        nowSeconds(),
+        JOB_CLAIM_LEASE_SECONDS,
+      );
+    } catch (error) {
+      console.error("Failed to claim summary queue job", {
+        queue: batch.queue,
+        messageId: message.id,
+        jobId: message.body.jobId,
+        error,
+      });
+      message.retry({ delaySeconds: RETRY_DELAY_SECONDS_DEFAULT });
+      continue;
+    }
+
+    if (claim.status === "already_done") {
+      message.ack();
+      continue;
+    }
+
+    if (claim.status === "in_flight") {
+      message.retry({ delaySeconds: computeInFlightRetryDelay(claim.leaseUntil) });
+      continue;
+    }
+
+    const acquiredClaim = claim;
+    const { jobId } = message.body;
+    try {
+      const job = message.body;
+      let disposition: QueueDisposition;
+      switch (job.type) {
+        case "daily":
+          disposition = await processDailySummaryJob(env, botToken, job);
+          break;
+        case "on_demand":
+          disposition = await processOnDemandSummaryJob(env, botToken, job);
+          break;
+        default: {
+          const exhaustiveCheck: never = job;
+          disposition = exhaustiveCheck;
+        }
       }
+
+      if (disposition.action === "retry") {
+        await safeReleaseJobClaimWithOwnership(env, jobId, acquiredClaim);
+        message.retry({ delaySeconds: disposition.delaySeconds });
+        continue;
+      }
+
+      const doneResult = await safeMarkSummaryQueueJobDone(
+        batch,
+        env,
+        message,
+        acquiredClaim,
+      );
+      if (doneResult === "error") {
+        await safeReleaseJobClaimWithOwnership(env, jobId, acquiredClaim);
+        message.retry({ delaySeconds: RETRY_DELAY_SECONDS_DEFAULT });
+        continue;
+      }
+
+      if (doneResult === "lost_claim") {
+        console.warn("Summary queue job claim lost before completion", {
+          queue: batch.queue,
+          messageId: message.id,
+          jobId,
+        });
+      }
+
+      message.ack();
     } catch (error) {
       console.error("Failed to process summary queue message", {
         queue: batch.queue,
         messageId: message.id,
+        jobId,
         attempts: message.attempts,
         error,
       });
+      await safeReleaseJobClaimWithOwnership(env, jobId, acquiredClaim);
       message.retry({ delaySeconds: RETRY_DELAY_SECONDS_DEFAULT });
     }
   }

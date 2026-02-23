@@ -38,45 +38,45 @@ export async function sendTelegramMessage(
     body: JSON.stringify(body),
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Failed to sendMessage", errorText);
+  if (response.ok) {
+    return true;
+  }
 
-    // Telegram rejects invalid parse entities with "can't parse entities".
-    // For reliability, retry once without parse_mode.
-    if (/can't parse entities/i.test(errorText)) {
-      const fallbackBody: TelegramSendMessageBody = {
-        chat_id: chatId,
-        text: `Summary (unformatted):\n\n${text}`,
-        disable_web_page_preview: true,
-      };
-      if (typeof replyToMessageId === "number") {
-        fallbackBody.reply_parameters = {
-          message_id: replyToMessageId,
-          allow_sending_without_reply: true,
-        };
-      }
+  const errorText = await response.text();
+  console.error("Failed to sendMessage", errorText);
 
-      const fallbackResponse = await fetch(
-        `${TELEGRAM_API_BASE}/bot${token}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(fallbackBody),
-        },
-      );
+  // Telegram rejects invalid parse entities with "can't parse entities".
+  // For reliability, retry once without parse_mode.
+  if (!/can't parse entities/i.test(errorText)) {
+    return false;
+  }
 
-      if (!fallbackResponse.ok) {
-        console.error(
-          "Failed to sendMessage (fallback)",
-          await fallbackResponse.text(),
-        );
-        return false;
-      }
+  const fallbackBody: TelegramSendMessageBody = {
+    chat_id: chatId,
+    text: `Summary (unformatted):\n\n${text}`,
+    disable_web_page_preview: true,
+  };
+  if (typeof replyToMessageId === "number") {
+    fallbackBody.reply_parameters = {
+      message_id: replyToMessageId,
+      allow_sending_without_reply: true,
+    };
+  }
 
-      return true;
-    }
+  const fallbackResponse = await fetch(
+    `${TELEGRAM_API_BASE}/bot${token}/sendMessage`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fallbackBody),
+    },
+  );
 
+  if (!fallbackResponse.ok) {
+    console.error(
+      "Failed to sendMessage (fallback)",
+      await fallbackResponse.text(),
+    );
     return false;
   }
 

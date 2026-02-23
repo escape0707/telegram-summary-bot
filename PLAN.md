@@ -229,7 +229,7 @@ ongoing cost and operational burden.
       without interim bot replies
 - [x] feat(consumer): process queued on-demand summary jobs and reply to source
       command message
-- [ ] feat(reliability): add idempotency guard for at-least-once queue delivery
+- [x] feat(reliability): add idempotency guard for at-least-once queue delivery
 - [ ] docs: update README + ops runbook for queue operation and failure handling
 
 ## Implementation Notes
