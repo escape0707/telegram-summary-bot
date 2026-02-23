@@ -18,7 +18,9 @@ vi.mock("../../db/rateLimits.js", () => ({
 
 vi.mock("../../queue/summaryQueueProducer.js", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../queue/summaryQueueProducer.js")>();
+    await importOriginal<
+      typeof import("../../queue/summaryQueueProducer.js")
+    >();
 
   return {
     ...actual,
@@ -76,7 +78,9 @@ describe("runDailySummary", () => {
     const runtime = makeRuntime(new Set<number>([-1001]));
     const controller = makeController(scheduledTimeMs);
 
-    await expect(runDailySummary(controller, env, runtime)).resolves.toBeUndefined();
+    await expect(
+      runDailySummary(controller, env, runtime),
+    ).resolves.toBeUndefined();
 
     expect(cleanupStaleRateLimits).toHaveBeenCalledWith(env, nowSeconds);
     expect(loadActiveChatsForWindow).toHaveBeenCalledWith(
@@ -111,7 +115,9 @@ describe("runDailySummary", () => {
     const runtime = makeRuntime(new Set<number>([-1001]));
     const controller = makeController(scheduledTimeMs);
 
-    await expect(runDailySummary(controller, env, runtime)).resolves.toBeUndefined();
+    await expect(
+      runDailySummary(controller, env, runtime),
+    ).resolves.toBeUndefined();
 
     expect(loadActiveChatsForWindow).toHaveBeenCalledWith(
       env,
@@ -156,7 +162,9 @@ describe("runDailySummary", () => {
     expect(thrownError).toBeInstanceOf(AppError);
     if (thrownError instanceof AppError) {
       expect(thrownError.code).toBe(ErrorCode.CronDispatchPartialFailure);
-      expect(thrownError.message).toContain("failed to enqueue daily summary jobs");
+      expect(thrownError.message).toContain(
+        "failed to enqueue daily summary jobs",
+      );
     }
 
     expect(enqueueSummaryJobs).toHaveBeenCalledTimes(1);
@@ -167,7 +175,9 @@ describe("runDailySummary", () => {
     const scheduledTimeMs = nowSeconds * 1_000;
     const windowStart = nowSeconds - 24 * 60 * 60;
 
-    vi.mocked(cleanupStaleRateLimits).mockRejectedValue(new Error("cleanup failed"));
+    vi.mocked(cleanupStaleRateLimits).mockRejectedValue(
+      new Error("cleanup failed"),
+    );
     vi.mocked(loadActiveChatsForWindow).mockResolvedValue([
       { chatId: -1001, chatUsername: "group_a" },
     ]);
@@ -176,7 +186,9 @@ describe("runDailySummary", () => {
     const runtime = makeRuntime(new Set<number>([-1001]));
     const controller = makeController(scheduledTimeMs);
 
-    await expect(runDailySummary(controller, env, runtime)).resolves.toBeUndefined();
+    await expect(
+      runDailySummary(controller, env, runtime),
+    ).resolves.toBeUndefined();
 
     expect(loadActiveChatsForWindow).toHaveBeenCalledWith(
       env,

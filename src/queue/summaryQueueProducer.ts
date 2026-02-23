@@ -4,7 +4,10 @@ import type { SummaryQueueMessage } from "./summaryJobs.js";
 
 export function requireSummaryQueue(env: Env): Queue<SummaryQueueMessage> {
   if (!env.SUMMARY_QUEUE) {
-    throw new AppError(ErrorCode.ConfigMissing, "SUMMARY_QUEUE is not configured");
+    throw new AppError(
+      ErrorCode.ConfigMissing,
+      "SUMMARY_QUEUE is not configured",
+    );
   }
 
   return env.SUMMARY_QUEUE;

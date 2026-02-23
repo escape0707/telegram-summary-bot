@@ -41,7 +41,10 @@ beforeEach(async () => {
 
 function expectAcquired(
   claim: SummaryQueueJobClaimResult,
-): asserts claim is Extract<SummaryQueueJobClaimResult, { status: "acquired" }> {
+): asserts claim is Extract<
+  SummaryQueueJobClaimResult,
+  { status: "acquired" }
+> {
   expect(claim.status).toBe("acquired");
 }
 
@@ -125,7 +128,12 @@ describe("summary queue idempotency", () => {
 
     const initialClaim = await claimSummaryQueueJob(appEnv, "job-1", 1_000, 5);
     expectAcquired(initialClaim);
-    const takeoverClaim = await claimSummaryQueueJob(appEnv, "job-1", 1_010, 30);
+    const takeoverClaim = await claimSummaryQueueJob(
+      appEnv,
+      "job-1",
+      1_010,
+      30,
+    );
     expectAcquired(takeoverClaim);
 
     await releaseSummaryQueueJobClaim(
@@ -134,7 +142,12 @@ describe("summary queue idempotency", () => {
       initialClaim.leaseUntil,
       initialClaim.updatedAt,
     );
-    const stillInFlight = await claimSummaryQueueJob(appEnv, "job-1", 1_011, 30);
+    const stillInFlight = await claimSummaryQueueJob(
+      appEnv,
+      "job-1",
+      1_011,
+      30,
+    );
 
     expect(stillInFlight).toEqual({
       status: "in_flight",

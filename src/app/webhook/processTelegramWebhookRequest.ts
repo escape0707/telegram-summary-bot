@@ -70,15 +70,10 @@ export async function processTelegramWebhookRequest(
   const isPrivateChat = message.chat.type === "private";
 
   if (hasBotCommandAtStart(message)) {
-    const response = await tryHandleCommand(
-      env,
-      runtime,
-      message,
-      {
-        allowedChat,
-        isPrivateChat,
-      },
-    );
+    const response = await tryHandleCommand(env, runtime, message, {
+      allowedChat,
+      isPrivateChat,
+    });
     if (response) {
       return response;
     }

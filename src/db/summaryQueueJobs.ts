@@ -39,12 +39,7 @@ export async function claimSummaryQueueJob(
       done_at
     ) VALUES (?, ?, ?, ?, NULL)`,
   )
-    .bind(
-      jobId,
-      SUMMARY_QUEUE_JOB_STATUS_PROCESSING,
-      leaseUntil,
-      nowTs,
-    )
+    .bind(jobId, SUMMARY_QUEUE_JOB_STATUS_PROCESSING, leaseUntil, nowTs)
     .run();
 
   if (insertResult.meta.changes > 0) {

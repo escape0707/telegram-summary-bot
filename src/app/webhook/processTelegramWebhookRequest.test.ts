@@ -28,7 +28,9 @@ vi.mock("../../db/serviceStats.js", () => ({
 
 vi.mock("../../queue/summaryQueueProducer.js", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../queue/summaryQueueProducer.js")>();
+    await importOriginal<
+      typeof import("../../queue/summaryQueueProducer.js")
+    >();
 
   return {
     ...actual,

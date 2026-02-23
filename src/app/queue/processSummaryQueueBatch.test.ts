@@ -5,7 +5,10 @@ import {
   releaseSummaryQueueJobClaim,
 } from "../../db/summaryQueueJobs.js";
 import { runTrackedSummarizeWindow } from "../summary/summarizeWindow.js";
-import { sendMessageToChat, sendReplyToChatMessage } from "../../telegram/send.js";
+import {
+  sendMessageToChat,
+  sendReplyToChatMessage,
+} from "../../telegram/send.js";
 import type { Env } from "../../env.js";
 import type { SummaryQueueMessage } from "../../queue/summaryJobs.js";
 import { processSummaryQueueBatch } from "./processSummaryQueueBatch.js";
@@ -52,7 +55,9 @@ function makeEnv(): Env {
   };
 }
 
-function makeDailyJob(overrides: Partial<SummaryQueueMessage> = {}): SummaryQueueMessage {
+function makeDailyJob(
+  overrides: Partial<SummaryQueueMessage> = {},
+): SummaryQueueMessage {
   return {
     type: "daily",
     jobId: "daily:-1001:100:200",
@@ -204,7 +209,9 @@ describe("processSummaryQueueBatch", () => {
   });
 
   it("acks duplicate jobs that are already done", async () => {
-    vi.mocked(claimSummaryQueueJob).mockResolvedValue({ status: "already_done" });
+    vi.mocked(claimSummaryQueueJob).mockResolvedValue({
+      status: "already_done",
+    });
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
 
@@ -296,7 +303,9 @@ describe("processSummaryQueueBatch", () => {
   });
 
   it("acks when completion write reports lost_claim", async () => {
-    vi.mocked(markSummaryQueueJobDone).mockResolvedValue({ status: "lost_claim" });
+    vi.mocked(markSummaryQueueJobDone).mockResolvedValue({
+      status: "lost_claim",
+    });
     const env = makeEnv();
     const { batch, ackFns, retryFns } = makeBatch([makeDailyJob()]);
 

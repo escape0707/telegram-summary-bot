@@ -50,7 +50,11 @@ describe("handleSummaryQueue", () => {
 
     await handleSummaryQueue(batch, env);
 
-    expect(processSummaryQueueBatch).toHaveBeenCalledWith(batch, env, "bot-token");
+    expect(processSummaryQueueBatch).toHaveBeenCalledWith(
+      batch,
+      env,
+      "bot-token",
+    );
     expect(retryAll).not.toHaveBeenCalled();
   });
 

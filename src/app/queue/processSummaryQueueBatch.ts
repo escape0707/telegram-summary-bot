@@ -11,8 +11,14 @@ import {
 } from "../../db/summaryRuns.js";
 import type { Env } from "../../env.js";
 import type { SummaryCommand } from "../../telegram/commands.js";
-import { sendMessageToChat, sendReplyToChatMessage } from "../../telegram/send.js";
-import { buildDailySummaryMessage, buildSummaryDegradedText } from "../../telegram/texts.js";
+import {
+  sendMessageToChat,
+  sendReplyToChatMessage,
+} from "../../telegram/send.js";
+import {
+  buildDailySummaryMessage,
+  buildSummaryDegradedText,
+} from "../../telegram/texts.js";
 import {
   type DailySummaryJob,
   type OnDemandSummaryJob,
@@ -236,7 +242,9 @@ export async function processSummaryQueueBatch(
     }
 
     if (claim.status === "in_flight") {
-      message.retry({ delaySeconds: computeInFlightRetryDelay(claim.leaseUntil) });
+      message.retry({
+        delaySeconds: computeInFlightRetryDelay(claim.leaseUntil),
+      });
       continue;
     }
 
