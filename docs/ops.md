@@ -66,6 +66,9 @@ This runbook covers setup, deploy, verification, and basic recovery for
 
 2. In an allowlisted Telegram group, send regular messages and run `/summary`,
    `/summaryday`, and `/status`.
+   - `/summary` and `/summaryday` should return no immediate bot reply.
+   - The actual summary reply should arrive asynchronously from queue consumer
+     processing.
 
 3. In DM, run `/start` and confirm onboarding/self-host guidance is shown.
 
@@ -75,12 +78,17 @@ This runbook covers setup, deploy, verification, and basic recovery for
    pnpm wrangler tail --format pretty
    ```
 
+5. Verify queue processing logs:
+   - `Received summary queue batch`
+   - For cron path, `Daily summary cron finished` includes `enqueuedCount`.
+
 ## Cron Checks
 
 - Current schedule is defined in `wrangler.jsonc`.
 - Verify cron runs in tail logs:
   - `Daily summary cron started`
   - `Daily summary cron finished`
+  - `enqueuedCount` should reflect active allowlisted chats.
 
 For short-interval testing, temporarily change cron schedule, deploy, verify,
 then revert.
@@ -90,17 +98,62 @@ then revert.
 - `src/handlers/telegramWebhook.ts`:
   thin tracked adapter for webhook requests.
 - `src/app/webhook/processTelegramWebhookRequest.ts`:
-  webhook business flow (auth check, update parsing, command handling, ingest).
+  webhook business flow (auth check, update parsing, command handling, enqueue,
+  ingest).
 - `src/handlers/dailySummaryCron.ts`:
   thin tracked adapter for scheduled events.
 - `src/app/cron/runDailySummary.ts`:
-  cron business flow (chat scan, summary generation, delivery, reporting).
+  cron business flow (chat scan, allowlist filter, summary job enqueue,
+  reporting).
+- `src/handlers/summaryQueue.ts`:
+  queue adapter for consumer batches and runtime token guard.
+- `src/app/queue/processSummaryQueueBatch.ts`:
+  queue consumer business flow (claim, summarize, Telegram send/reply,
+  retry/ack).
+- `src/db/summaryQueueJobs.ts`:
+  idempotency claim store for at-least-once queue delivery.
 - `src/app/summary/summarizeWindow.ts`:
-  shared "load messages + summarize window" pipeline reused by command and cron.
-- `src/telegram/replies.ts` and `src/telegram/texts.ts`:
+  shared "load messages + summarize window" pipeline reused by queue jobs.
+- `src/telegram/send.ts` and `src/telegram/texts.ts`:
   reusable Telegram send helpers and user-facing text builders.
 - `src/observability/serviceTracking.ts` and `src/errors/appError.ts`:
   tracked operation wrappers and typed application error codes.
+
+## Queue Operation Model
+
+- Queue binding:
+  - Producer binding: `SUMMARY_QUEUE`.
+  - Queue name: `summary-jobs`.
+  - Consumer config in `wrangler.jsonc`:
+    - `max_batch_size=1`
+    - `max_batch_timeout=0`
+- Producer responsibilities:
+  - Webhook enqueues on-demand jobs for `/summary` and `/summaryday`.
+  - Daily cron enqueues daily jobs per allowlisted active chat.
+- Consumer responsibilities:
+  - Performs summary generation and Telegram delivery.
+  - Applies idempotency claim checks to avoid duplicate sends across retries.
+  - Uses at-least-once-safe completion with ownership checks.
+
+## Queue Failure Handling
+
+- Producer-side failures:
+  - Webhook enqueue failure returns `500` (`internal error`) so Telegram may
+    retry update delivery.
+  - Missing `SUMMARY_QUEUE` binding returns `500`.
+  - Daily cron enqueue failure throws tracked `CronDispatchPartialFailure`.
+- Consumer-side failures:
+  - Missing or empty `TELEGRAM_BOT_TOKEN`: `retryAll` on the batch.
+  - Claim read/write failure: retry message with default delay.
+  - `in_flight` claim: retry with delay aligned to lease expiry.
+  - Daily `ai_error`: retry with longer delay.
+  - Daily `no_messages`, `no_text`, `degraded`: ack silently.
+  - On-demand `no_messages`, `no_text`, `degraded`: send user-facing reply and
+    ack.
+  - Claim ownership lost during completion: warn and ack (prevents duplicate
+    loops).
+- DLQ:
+  - Not configured in current queue v1 rollout.
 
 ## Summary Persistence Semantics
 
@@ -137,6 +190,8 @@ then revert.
 - Current behavior:
   - Returns `200` for successfully handled updates and intentionally ignored
     updates (for example unknown commands).
+  - For `/summary` and `/summaryday`, `200` indicates "job enqueued" (or command
+    path accepted), not "summary already delivered".
   - Returns `4xx` for method/auth/request-shape errors.
   - Returns `5xx` for internal processing failures (for example DB/send errors).
 
@@ -204,6 +259,12 @@ Use your own controlled harness/script and keep source labeling explicit.
 7. `Summary generation is temporarily unavailable due to recent AI failures`:
    Degraded mode is active.
    Check recent `ai_error` logs and wait for the rolling window to recover.
+8. `/summary` command accepted (`200`) but no summary arrives:
+   Check queue consumer logs for:
+   - `Received summary queue batch`
+   - claim warnings/errors (`Failed to claim summary queue job`,
+     `Summary queue job claim lost before completion`)
+   - Telegram send/reply failures
 
 ## Recovery
 

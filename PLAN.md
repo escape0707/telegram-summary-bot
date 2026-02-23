@@ -230,7 +230,7 @@ ongoing cost and operational burden.
 - [x] feat(consumer): process queued on-demand summary jobs and reply to source
       command message
 - [x] feat(reliability): add idempotency guard for at-least-once queue delivery
-- [ ] docs: update README + ops runbook for queue operation and failure handling
+- [x] docs: update README + ops runbook for queue operation and failure handling
 
 ## Implementation Notes
 

@@ -16,14 +16,50 @@ on-demand and daily AI summaries.
 ## Architecture
 
 - Ingress: Telegram sends updates to Worker webhook (`/telegram`), which
-  validates secret headers, parses commands, and ingests group messages.
+  validates secret headers, parses commands, enqueues summary jobs, and ingests
+  group messages.
 - Storage: D1 stores raw messages, summaries, service stats, and rate-limit
-  counters.
+  counters, plus queue-idempotency claim records.
 - Summarization: shared application pipeline loads windowed messages and calls
-  Workers AI for clustered summaries.
-- Scheduling: Cloudflare Cron triggers daily summary dispatch at 08:00 UTC.
+  Workers AI for clustered summaries in queue consumers.
+- Scheduling: Cloudflare Cron enqueues daily summary jobs at 08:00 UTC.
+- Queue: Cloudflare Queues (`summary-jobs`) processes one job per batch
+  (`max_batch_size=1`, `max_batch_timeout=0`) to minimize delivery latency.
 - Ops: tracked wrappers persist success/error state for `/status` and incident
   debugging.
+
+## Queue-Based Summary Flow
+
+- `/summary` and `/summaryday` in allowlisted groups are enqueue-only:
+  - Webhook applies rate limiting.
+  - Webhook enqueues an on-demand summary job.
+  - Webhook returns `200` immediately (no interim "processing" reply).
+  - The queue consumer posts the actual reply when processing completes.
+- Daily cron is enqueue-only:
+  - Loads active chats in the last 24h.
+  - Skips non-allowlisted chats.
+  - Enqueues one daily summary job per target chat.
+- Queue consumer behavior:
+  - Daily jobs: summarize and post to chat.
+  - On-demand jobs: summarize and reply to the source command message.
+  - Delivery is at-least-once; processing is protected with D1 claim idempotency.
+
+## Queue Retry and Failure Semantics
+
+- Queue delivery is at-least-once. `summary_queue_jobs` prevents duplicate
+  summary sends/replies across retries and overlapping consumers.
+- Ownership-safe completion/release:
+  - Claims include ownership fields (`lease_until`, `updated_at`).
+  - Done/release operations are conditional on the same ownership fields.
+- Retries:
+  - `in_flight` claim: message retries near lease expiry.
+  - `ai_error` on daily jobs: retry with longer delay.
+  - transient processing/send/DB failures: retry with default delay.
+- Non-retry outcomes:
+  - Daily `no_messages`, `no_text`, `degraded`: ack silently (no chat message).
+  - On-demand `no_messages`, `no_text`, `degraded`: send user-facing reply, then
+    ack.
+- Queue v1 currently has no DLQ configured.
 
 ## Summary Persistence
 
