@@ -177,6 +177,7 @@ Optional:
 - `pnpm run test:workers`: run Workers integration tests
   (`*.worker.test.ts`).
 - `pnpm run test:coverage`: run unit tests with coverage report.
+- `pnpm run typecheck`: run TypeScript compiler checks with `tsc`.
 - `pnpm run format`: format files with Prettier.
 - `pnpm run format:check`: check formatting in CI/local.
 - `pnpm run lint`: run ESLint.
